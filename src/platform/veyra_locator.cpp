@@ -2,15 +2,14 @@
 
 #include <windows.h>
 #include <shellapi.h>
-#include <tlhelp32.h>
 
 #include <cstdlib>
 #include <deque>
 #include <filesystem>
-#include <iterator>
 #include <vector>
 
 #include "core/app_model.h"
+#include "platform/process_list.h"
 
 #pragma comment(lib, "shell32.lib")
 
@@ -22,34 +21,11 @@ namespace fs = std::filesystem;
 constexpr int kMaxSearchDepth = 3;
 constexpr std::size_t kMaxVisited = 6000;
 
-std::optional<std::wstring> ProcessImagePath(DWORD pid) {
-    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-    if (!process) return std::nullopt;
-    wchar_t path[32768];
-    DWORD length = static_cast<DWORD>(std::size(path));
-    const bool ok = QueryFullProcessImageNameW(process, 0, path, &length) != 0;
-    CloseHandle(process);
-    if (!ok) return std::nullopt;
-    return std::wstring(path, length);
-}
-
 std::optional<std::wstring> RunningVeyra() {
-    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (snapshot == INVALID_HANDLE_VALUE) return std::nullopt;
-    PROCESSENTRY32W entry{};
-    entry.dwSize = sizeof(entry);
-    std::optional<std::wstring> found;
-    if (Process32FirstW(snapshot, &entry)) {
-        do {
-            const auto path = ProcessImagePath(entry.th32ProcessID);
-            if (path && IsVeyraExecutableName(fs::path(*path).filename().wstring())) {
-                found = path;
-                break;
-            }
-        } while (Process32NextW(snapshot, &entry));
+    for (const std::wstring& path : RunningProcessImagePaths()) {
+        if (IsVeyraExecutableName(fs::path(path).filename().wstring())) return path;
     }
-    CloseHandle(snapshot);
-    return found;
+    return std::nullopt;
 }
 
 std::optional<std::wstring> SearchFolder(const fs::path& root) {

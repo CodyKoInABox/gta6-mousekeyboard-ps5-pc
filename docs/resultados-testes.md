@@ -1,15 +1,15 @@
 # Resultados dos testes
 
-Versão testada: 0.1.0, construída por `scripts/build-release.ps1` a partir do branch `cursor/installer-f066`.
+Versão testada: 0.1.0, construída por `scripts/build-release.ps1` a partir do branch `cursor/audit-gaps-f066`.
 Máquina: Windows 10 Pro 22H2 (build 19045), x64, Visual Studio 2022 (MSVC), CMake 3.23+.
 
 ## 1. Testes automatizados
 
 Comando: `scripts\build-release.ps1` (roda `pskb_tests.exe` antes de empacotar).
 
-- Resultado: **161 testes, 0 falhas**.
+- Resultado: **199 testes, 0 falhas**.
 - Saída completa: `dist\test-results.txt`.
-- Cobertura: mapeamento de teclas e gatilhos, mouse para analógico (zona morta, curva, aceleração, retorno ao centro), perfis, estado do link e reconexão (com backend simulado), captura e gate de entrada, pareamento e armazenamento DPAPI, configurações, normalização de PIN, status do app e etapas do assistente, detecção do Veyra.
+- Cobertura: mapeamento de teclas e gatilhos, mouse para analógico (zona morta, curva, aceleração, retorno ao centro, sensibilidade de câmera e de mira), edição de teclas por perfil (validação, conflitos, restaurar padrão), perfis, estado do link e reconexão (com backend simulado, incluindo a espera sem rede), captura e gate de entrada, pareamento e armazenamento DPAPI, configurações (incluindo suavização e curva), normalização de PIN, status do app e etapas do assistente, detecção do Veyra, detecção de outro cliente de Remote Play, versão do Windows (Supported, Untested, Unsupported).
 
 Os testes não usam PS5 nem rede.
 

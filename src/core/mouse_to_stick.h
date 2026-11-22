@@ -6,8 +6,10 @@
 namespace pskb {
 
 struct AimSettings {
-    float sensitivityX = 1.0f;     // multiplier, 0.1..5
-    float sensitivityY = 1.0f;     // multiplier, 0.1..5
+    float sensitivityX = 1.0f;     // camera (not aiming), multiplier, 0.1..5
+    float sensitivityY = 1.0f;     // camera (not aiming), multiplier, 0.1..5
+    float aimSensitivityX = 0.5f;  // used while aiming (L2 held), multiplier, 0.1..5
+    float aimSensitivityY = 0.5f;  // used while aiming (L2 held), multiplier, 0.1..5
     bool invertY = false;
     float deadzone = 0.02f;        // fraction of full deflection ignored near centre, 0..0.5
     float antiDeadzone = 0.10f;    // fraction of full deflection applied as soon as the stick moves, 0..0.5
@@ -36,7 +38,8 @@ public:
     const AimSettings& Settings() const noexcept { return settings_; }
 
     void AddMotion(double timeMs, int dx, int dy);
-    StickVector Evaluate(double timeMs);
+    // aiming selects the aiming sensitivity instead of the camera sensitivity.
+    StickVector Evaluate(double timeMs, bool aiming = false);
     void Reset();
 
     // Exposed for tests and the response-curve preview in the settings screen.

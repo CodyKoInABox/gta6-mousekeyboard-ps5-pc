@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -71,5 +72,32 @@ bool ParseBindings(std::string_view text, Profile& profile, std::string* error =
 // Empty when valid. A physical input may drive only one action; one action may have
 // several inputs (for example W and Up both driving the left stick).
 std::string ValidateBindings(const Profile& profile);
+
+// Built-in profile for an id: "driving" gives DrivingProfile(), anything else GtaProfile().
+Profile ProfileById(std::string_view id);
+
+// Built-in profile with the user's saved bindings applied. Saved text that does not parse or
+// conflicts is ignored and the defaults are used.
+Profile ProfileWithBindings(std::string_view id, std::string_view savedBindings);
+
+// Single-line form stored in settings.ini: "input=action;input=action".
+std::string SerializeBindingsInline(const Profile& profile);
+bool ParseBindingsInline(std::string_view text, Profile& profile, std::string* error = nullptr);
+
+// Empty when `input` may be bound. Esc is kept for leaving the capture, the Windows keys are
+// reserved by the shell, the capture hotkey must keep working, and only left, right, and
+// middle mouse buttons are supported.
+std::string_view BindableInputError(InputCode input, unsigned int captureHotkeyVk) noexcept;
+
+// Display helpers for the bindings window (Portuguese labels).
+std::string_view ActionLabel(Action action) noexcept;
+std::string InputLabel(InputCode input);
+
+// Edits keep the profile valid. Each returns the action that lost `input` when the input was
+// moved away from a different action, so the UI can tell the user what changed.
+std::optional<Action> SetBindingInput(Profile& profile, std::size_t index, InputCode input);
+std::optional<Action> AddBinding(Profile& profile, Action action, InputCode input);
+// Refuses to remove the last binding, so a profile can never end up with no keys at all.
+bool RemoveBinding(Profile& profile, std::size_t index);
 
 }  // namespace pskb

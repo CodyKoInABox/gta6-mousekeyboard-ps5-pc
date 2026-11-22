@@ -3,9 +3,11 @@
 #include <deque>
 #include <initializer_list>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
 
+#include "core/app_model.h"
 #include "core/link_manager.h"
 #include "test_framework.h"
 
@@ -297,4 +299,48 @@ PSKB_TEST(DestroyingWhileConnectedReleasesPad) {
         CHECK(WaitFor([&] { return link.Status().state == LinkState::Connected; }));
     }
     CHECK(backend.disconnectCalls.load() >= 1);
+}
+
+PSKB_TEST(NoNetworkWaitsWithoutConnectingAndResumesWhenBack) {
+    MockBackend backend;
+    backend.Script({{true, LinkError::None}});
+    std::atomic<bool> up{false};
+    RetryPolicy policy = FastPolicy();
+    policy.networkCheckMs = 5;
+    LinkManager link(backend, Loader(), policy, [&] { return up.load(); });
+
+    link.Connect();
+    CHECK(WaitFor([&] { return link.Status().error == LinkError::NetworkUnavailable; }));
+    CHECK(link.Status().state == LinkState::Retrying);
+    CHECK(link.Status().message.find("Sem conexão") != std::string::npos);
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    CHECK_EQ(backend.connectCalls.load(), 0);
+
+    up = true;
+    CHECK(WaitFor([&] { return link.Status().state == LinkState::Connected; }));
+    CHECK_EQ(backend.connectCalls.load(), 1);
+    link.Disconnect();
+}
+
+PSKB_TEST(ConnectFailureWithoutNetworkIsNetworkUnavailableAndNotFatal) {
+    MockBackend backend;
+    backend.Script({{false, LinkError::NotFound}});
+    std::atomic<int> probes{0};
+    RetryPolicy policy = FastPolicy();
+    policy.networkCheckMs = 5;
+    LinkManager link(backend, Loader(), policy, [&] { return probes++ == 0; });
+
+    link.Connect();
+    CHECK(WaitFor([&] { return link.Status().error == LinkError::NetworkUnavailable; }));
+    CHECK(link.Status().state == LinkState::Retrying);
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    CHECK(link.Status().state != LinkState::Failed);
+    CHECK_EQ(backend.connectCalls.load(), 1);
+    link.Disconnect();
+}
+
+PSKB_TEST(NoNetworkStatusMapsToSemRedeNotConnecting) {
+    CHECK(DeriveAppStatus(LinkState::Retrying, CaptureMode::Off, LinkError::NetworkUnavailable) == AppStatus::NoNetwork);
+    CHECK(DeriveAppStatus(LinkState::Retrying, CaptureMode::Off, LinkError::Asleep) == AppStatus::Connecting);
+    CHECK(std::string(AppStatusText(AppStatus::NoNetwork)) == "Sem rede");
 }

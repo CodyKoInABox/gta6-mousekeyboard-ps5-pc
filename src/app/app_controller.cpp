@@ -3,6 +3,7 @@
 #include "app/saved_pairing.h"
 #include "app/ui.h"
 #include "core/app_paths.h"
+#include "platform/network_status.h"
 #include "platform/veyra_locator.h"
 
 namespace pskb {
@@ -20,7 +21,9 @@ bool AppController::SaveSettings() const {
 bool AppController::HasPairing() const { return LoadSavedPairing().has_value(); }
 
 Profile AppController::ActiveProfile() const {
-    Profile profile = settings_.profileId == "driving" ? DrivingProfile() : GtaProfile();
+    const auto saved = settings_.savedBindings.find(settings_.profileId);
+    const std::string savedText = saved == settings_.savedBindings.end() ? std::string{} : saved->second;
+    Profile profile = ProfileWithBindings(settings_.profileId, savedText);
     profile.aim = settings_.aim;
     return profile;
 }
@@ -45,7 +48,8 @@ bool AppController::StartPlay(std::string* error) {
     backend_ = std::make_unique<ChiakiBackend>();
     RetryPolicy policy;
     policy.autoReconnect = settings_.autoReconnect;
-    link_ = std::make_unique<LinkManager>(*backend_, [] { return LoadSavedPairing(); }, policy);
+    link_ = std::make_unique<LinkManager>(*backend_, [] { return LoadSavedPairing(); }, policy,
+                                          [] { return HasUsableNetwork(); });
 
     LinkManager* link = link_.get();
     CaptureOptions options;
@@ -89,8 +93,8 @@ void AppController::Tick() {
 }
 
 AppStatus AppController::Status() const {
-    const LinkState link = link_ ? link_->Status().state : LinkState::Idle;
-    return DeriveAppStatus(link, Capture());
+    const LinkStatus link = link_ ? link_->Status() : LinkStatus{};
+    return DeriveAppStatus(link.state, Capture(), link.error);
 }
 
 std::string AppController::StatusMessage() const {

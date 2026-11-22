@@ -16,6 +16,8 @@ void MouseToStick::Configure(const AimSettings& settings) {
     settings_ = settings;
     settings_.sensitivityX = std::clamp(settings_.sensitivityX, 0.05f, 10.0f);
     settings_.sensitivityY = std::clamp(settings_.sensitivityY, 0.05f, 10.0f);
+    settings_.aimSensitivityX = std::clamp(settings_.aimSensitivityX, 0.05f, 10.0f);
+    settings_.aimSensitivityY = std::clamp(settings_.aimSensitivityY, 0.05f, 10.0f);
     settings_.deadzone = std::clamp(settings_.deadzone, 0.0f, 0.5f);
     settings_.antiDeadzone = std::clamp(settings_.antiDeadzone, 0.0f, 0.5f);
     settings_.curveExponent = std::clamp(settings_.curveExponent, 1.0f, 3.0f);
@@ -70,18 +72,21 @@ float MouseToStick::ShapeMagnitude(float magnitude, const AimSettings& s) {
     return s.antiDeadzone + (1.0f - s.antiDeadzone) * m;
 }
 
-StickVector MouseToStick::Evaluate(double timeMs) {
+StickVector MouseToStick::Evaluate(double timeMs, bool aiming) {
     const double dtMs = lastEvalMs_ < 0.0 ? 0.0 : std::max(0.0, timeMs - lastEvalMs_);
     lastEvalMs_ = timeMs;
 
     Expire(timeMs - settings_.windowMs);
 
+    const float sensX = aiming ? settings_.aimSensitivityX : settings_.sensitivityX;
+    const float sensY = aiming ? settings_.aimSensitivityY : settings_.sensitivityY;
+
     StickVector target{};
     const bool recentlyMoved = timeMs - lastMotionMs_ <= settings_.recenterMs;
     if (count_ > 0 && recentlyMoved) {
         const double window = settings_.windowMs;
-        const float vx = static_cast<float>(sumX_ / window) * settings_.sensitivityX;
-        float vy = static_cast<float>(sumY_ / window) * settings_.sensitivityY;
+        const float vx = static_cast<float>(sumX_ / window) * sensX;
+        float vy = static_cast<float>(sumY_ / window) * sensY;
         if (settings_.invertY) vy = -vy;
         const float countsPerSec = std::sqrt(vx * vx + vy * vy) * 1000.0f;
         if (countsPerSec > 0.0f) {

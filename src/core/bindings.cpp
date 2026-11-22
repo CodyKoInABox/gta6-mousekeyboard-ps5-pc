@@ -199,4 +199,132 @@ std::string ValidateBindings(const Profile& profile) {
     return {};
 }
 
+Profile ProfileById(std::string_view id) {
+    return id == "driving" ? DrivingProfile() : GtaProfile();
+}
+
+Profile ProfileWithBindings(std::string_view id, std::string_view savedBindings) {
+    Profile profile = ProfileById(id);
+    if (!savedBindings.empty()) {
+        Profile saved = profile;
+        if (ParseBindingsInline(savedBindings, saved)) profile = std::move(saved);
+    }
+    return profile;
+}
+
+std::string SerializeBindingsInline(const Profile& profile) {
+    std::string out;
+    for (const auto& b : profile.bindings) {
+        if (!out.empty()) out += ';';
+        out += InputCodeToName(b.input);
+        out += '=';
+        out += ActionToName(b.action);
+    }
+    return out;
+}
+
+bool ParseBindingsInline(std::string_view text, Profile& profile, std::string* error) {
+    std::string lines(text);
+    std::replace(lines.begin(), lines.end(), ';', '\n');
+    Profile candidate = profile;
+    if (!ParseBindings(lines, candidate, error)) return false;
+    const std::string conflict = ValidateBindings(candidate);
+    if (!conflict.empty()) {
+        if (error) *error += conflict + "\n";
+        return false;
+    }
+    profile = std::move(candidate);
+    return true;
+}
+
+std::string_view BindableInputError(InputCode input, unsigned int captureHotkeyVk) noexcept {
+    if (input == 0x1B) return "Esc é reservado para cancelar e não pode ser usado.";
+    if (input == 0x5B || input == 0x5C) return "A tecla Windows não pode ser usada.";
+    if (input == captureHotkeyVk) return "Essa tecla liga e desliga a captura. Escolha outra.";
+    if (input == kMouseX1 || input == kMouseX2) return "Botões laterais do mouse não são suportados.";
+    if (!IsMouseButtonCode(input)) {
+        const auto name = InputCodeFromName(InputCodeToName(input));
+        if (!name || *name != input) return "Essa tecla não tem nome estável e não pode ser salva.";
+    }
+    return {};
+}
+
+std::string_view ActionLabel(Action action) noexcept {
+    switch (action) {
+        case Action::Cross: return "X";
+        case Action::Circle: return "Círculo";
+        case Action::Square: return "Quadrado";
+        case Action::Triangle: return "Triângulo";
+        case Action::DpadUp: return "Direcional: cima";
+        case Action::DpadDown: return "Direcional: baixo";
+        case Action::DpadLeft: return "Direcional: esquerda";
+        case Action::DpadRight: return "Direcional: direita";
+        case Action::L1: return "L1";
+        case Action::R1: return "R1";
+        case Action::L2: return "L2 (gatilho esquerdo, mira)";
+        case Action::R2: return "R2 (gatilho direito, tiro)";
+        case Action::L3: return "L3 (clique do analógico esquerdo)";
+        case Action::R3: return "R3 (clique do analógico direito)";
+        case Action::Options: return "Options";
+        case Action::Share: return "Share";
+        case Action::Touchpad: return "Touchpad";
+        case Action::Ps: return "Botão PS";
+        case Action::LeftStickUp: return "Analógico esquerdo: cima";
+        case Action::LeftStickDown: return "Analógico esquerdo: baixo";
+        case Action::LeftStickLeft: return "Analógico esquerdo: esquerda";
+        case Action::LeftStickRight: return "Analógico esquerdo: direita";
+    }
+    return "Desconhecido";
+}
+
+std::string InputLabel(InputCode input) {
+    switch (input) {
+        case kMouseLeft: return "Mouse: botão esquerdo";
+        case kMouseRight: return "Mouse: botão direito";
+        case kMouseMiddle: return "Mouse: botão do meio";
+        default: return InputCodeToName(input);
+    }
+}
+
+std::optional<Action> SetBindingInput(Profile& profile, std::size_t index, InputCode input) {
+    if (index >= profile.bindings.size()) return std::nullopt;
+    if (profile.bindings[index].input == input) return std::nullopt;
+
+    const Action action = profile.bindings[index].action;
+    std::optional<Action> displaced;
+    std::size_t row = index;
+    for (std::size_t i = 0; i < profile.bindings.size();) {
+        if (profile.bindings[i].input != input) {
+            ++i;
+            continue;
+        }
+        if (profile.bindings[i].action != action) displaced = profile.bindings[i].action;
+        profile.bindings.erase(profile.bindings.begin() + static_cast<std::ptrdiff_t>(i));
+        if (i < row) --row;
+    }
+    profile.bindings[row].input = input;
+    return displaced;
+}
+
+std::optional<Action> AddBinding(Profile& profile, Action action, InputCode input) {
+    std::optional<Action> displaced;
+    for (std::size_t i = 0; i < profile.bindings.size();) {
+        if (profile.bindings[i].input != input) {
+            ++i;
+            continue;
+        }
+        if (profile.bindings[i].action == action) return std::nullopt;
+        displaced = profile.bindings[i].action;
+        profile.bindings.erase(profile.bindings.begin() + static_cast<std::ptrdiff_t>(i));
+    }
+    profile.bindings.push_back({input, action});
+    return displaced;
+}
+
+bool RemoveBinding(Profile& profile, std::size_t index) {
+    if (profile.bindings.size() <= 1 || index >= profile.bindings.size()) return false;
+    profile.bindings.erase(profile.bindings.begin() + static_cast<std::ptrdiff_t>(index));
+    return true;
+}
+
 }  // namespace pskb

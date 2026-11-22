@@ -14,7 +14,9 @@
 #include "backend/psn_signin.h"
 #include "core/psn_login.h"
 #include "core/secure_store.h"
+#include "core/windows_support.h"
 #include "platform/veyra_locator.h"
+#include "platform/windows_version.h"
 
 namespace pskb {
 namespace {
@@ -49,19 +51,6 @@ enum Id : int {
     kVeyraBrowse,
     kLaunchVeyra,
 };
-
-// IsWindows10OrGreater needs a compatibility manifest entry; RtlGetVersion reports the real version.
-bool IsWindows10OrNewer() {
-    using RtlGetVersionFn = LONG(WINAPI*)(PRTL_OSVERSIONINFOW);
-    const HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
-    const auto rtlGetVersion = ntdll ? reinterpret_cast<RtlGetVersionFn>(GetProcAddress(ntdll, "RtlGetVersion"))
-                                     : nullptr;
-    if (!rtlGetVersion) return false;
-    RTL_OSVERSIONINFOW info{};
-    info.dwOSVersionInfoSize = sizeof(info);
-    if (rtlGetVersion(&info) != 0) return false;
-    return info.dwMajorVersion >= 10;
-}
 
 bool IsControlClass(HWND control, const wchar_t* name) {
     wchar_t buffer[32] = {};
@@ -207,9 +196,26 @@ void SetupWizard::BuildWelcome() {
                   "Você vai precisar do PS5 ligado (ou em repouso com \"Ligar pela rede\"), do PC e do PS5 na mesma "
                   "rede, e da conta PSN que você usa no PS5. Leva uns cinco minutos.",
                   kPageLabel, 40, 220, 680, 80, ui::Font(19)));
-    const bool windowsOk = IsWindows10OrNewer();
-    Add(ui::Label(hwnd_, windowsOk ? "Windows compatível." : "Este app precisa do Windows 10 ou 11.", kPageLabel, 40,
-                  330, 680, 30, ui::Font(20, FW_SEMIBOLD), windowsOk ? ui::kGood : ui::kBad));
+    const WindowsVersion windows = CurrentWindowsVersion();
+    const WindowsSupport support = CheckWindowsSupport(windows);
+    switch (support) {
+        case WindowsSupport::Supported:
+            Add(ui::Label(hwnd_, "Windows compatível.", kPageLabel, 40, 330, 680, 30, ui::Font(20, FW_SEMIBOLD),
+                          ui::kGood));
+            break;
+        case WindowsSupport::Untested:
+            Add(ui::Label(hwnd_, "Windows antigo: pode funcionar, mas não foi testado.", kPageLabel, 40, 330, 680, 30,
+                          ui::Font(20, FW_SEMIBOLD), ui::kWarn));
+            Add(ui::Label(hwnd_, WindowsSupportMessage(windows, support), kPageLabel, 40, 366, 680, 50, ui::Font(17),
+                          ui::kMuted));
+            break;
+        case WindowsSupport::Unsupported:
+            Add(ui::Label(hwnd_, "Este Windows não é compatível.", kPageLabel, 40, 330, 680, 30,
+                          ui::Font(20, FW_SEMIBOLD), ui::kBad));
+            Add(ui::Label(hwnd_, WindowsSupportMessage(windows, support), kPageLabel, 40, 366, 680, 50, ui::Font(17),
+                          ui::kMuted));
+            break;
+    }
 }
 
 void SetupWizard::BuildConsole() {

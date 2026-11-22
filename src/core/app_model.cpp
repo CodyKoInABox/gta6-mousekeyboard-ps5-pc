@@ -13,18 +13,20 @@ const char* AppStatusText(AppStatus status) noexcept {
         case AppStatus::Connecting: return "Conectando";
         case AppStatus::Connected: return "Conectado";
         case AppStatus::Playing: return "Jogando";
+        case AppStatus::NoNetwork: return "Sem rede";
         case AppStatus::Error: return "Erro";
     }
     return "Desconectado";
 }
 
-AppStatus DeriveAppStatus(LinkState link, CaptureMode capture) noexcept {
+AppStatus DeriveAppStatus(LinkState link, CaptureMode capture, LinkError error) noexcept {
     switch (link) {
         case LinkState::Failed:
             return AppStatus::Error;
         case LinkState::Connecting:
-        case LinkState::Retrying:
             return AppStatus::Connecting;
+        case LinkState::Retrying:
+            return error == LinkError::NetworkUnavailable ? AppStatus::NoNetwork : AppStatus::Connecting;
         case LinkState::Connected:
             return capture == CaptureMode::Active ? AppStatus::Playing : AppStatus::Connected;
         case LinkState::Idle:

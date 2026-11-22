@@ -5,6 +5,7 @@
 #include <fstream>
 #include <map>
 #include <sstream>
+#include <string_view>
 #include <system_error>
 
 namespace pskb {
@@ -69,6 +70,11 @@ std::string SerializeSettings(const AppSettings& s) {
     out << "aim.recenter_ms=" << s.aim.recenterMs << '\n';
     out << "aim.window_ms=" << s.aim.windowMs << '\n';
     out << "aim.full_counts_per_sec=" << s.aim.fullDeflectionCountsPerSec << '\n';
+    out << "aim.aim_sensitivity_x=" << s.aim.aimSensitivityX << '\n';
+    out << "aim.aim_sensitivity_y=" << s.aim.aimSensitivityY << '\n';
+    for (const auto& [profileId, text] : s.savedBindings) {
+        out << "bindings." << profileId << '=' << text << '\n';
+    }
     return out.str();
 }
 
@@ -117,6 +123,17 @@ bool ParseSettings(const std::string& text, AppSettings& s) {
     floatKey("aim.recenter_ms", out.aim.recenterMs);
     floatKey("aim.window_ms", out.aim.windowMs);
     floatKey("aim.full_counts_per_sec", out.aim.fullDeflectionCountsPerSec);
+    floatKey("aim.aim_sensitivity_x", out.aim.aimSensitivityX);
+    floatKey("aim.aim_sensitivity_y", out.aim.aimSensitivityY);
+
+    constexpr std::string_view kBindingsPrefix = "bindings.";
+    out.savedBindings.clear();
+    for (const auto& [key, value] : kv) {
+        if (key.compare(0, kBindingsPrefix.size(), kBindingsPrefix) != 0) continue;
+        const std::string profileId = key.substr(kBindingsPrefix.size());
+        if (profileId.empty()) continue;
+        out.savedBindings[profileId] = value;
+    }
 
     if (!ok) return false;
     s = out;

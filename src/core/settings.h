@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <map>
 #include <string>
 
 #include "core/mouse_to_stick.h"
@@ -19,6 +20,9 @@ struct AppSettings {
     std::string profileId = "gta6";   // "gta6" or "driving"
     unsigned int captureHotkeyVk = 0x77;  // F8
     AimSettings aim;
+    // Profile id -> inline bindings text (see SerializeBindingsInline). A profile missing
+    // here uses its built-in defaults.
+    std::map<std::string, std::string> savedBindings;
 };
 
 // Plain key=value text, one per line, '#' comments. Unknown keys are ignored so older
