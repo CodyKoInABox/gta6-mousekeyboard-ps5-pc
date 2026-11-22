@@ -147,6 +147,10 @@ LRESULT SetupWizard::OnMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM lP
             if (ui::DrawButton(lParam)) return TRUE;
             break;
         case WM_CLOSE:
+            if (busy_) {
+                SetStatus("Aguarde a tarefa terminar antes de fechar.", ui::kMuted);
+                return 0;
+            }
             DestroyWindow(hwnd);
             return 0;
         case WM_DESTROY:
@@ -294,7 +298,7 @@ void SetupWizard::BuildVeyra() {
 }
 
 void SetupWizard::BuildDone() {
-    Add(ui::Label(hwnd_, "Pronto para jogar", kPageLabel, 40, 130, 680, 60, ui::Font(42, FW_BOLD), ui::kGood));
+    Add(ui::Label(hwnd_, "Configuração concluída.", kPageLabel, 40, 130, 680, 60, ui::Font(42, FW_BOLD), ui::kGood));
     Add(ui::Label(hwnd_,
                   "Abra o Veyra e depois pressione JOGAR na tela principal. Quando o Veyra estiver em foco, seu teclado "
                   "e mouse controlam o jogo no PS5. F8 liga e desliga a captura; Esc libera tudo.\r\n\r\n"
