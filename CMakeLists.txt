@@ -89,6 +89,7 @@ add_executable(pskb_app WIN32
   src/app/setup_wizard.cpp
   src/app/settings_window.cpp
   src/app/bindings_window.cpp
+  src/app/self_test.cpp
 )
 target_compile_options(pskb_app PRIVATE /W4 /utf-8 /permissive-)
 target_compile_definitions(pskb_app PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)

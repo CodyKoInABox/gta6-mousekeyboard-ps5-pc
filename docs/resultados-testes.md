@@ -1,6 +1,6 @@
 # Resultados dos testes
 
-Versão testada: 0.1.0, construída por `scripts/build-release.ps1` a partir do branch `cursor/audit-gaps-f066`.
+Versão testada: 0.1.0, construída por `scripts/build-release.ps1` a partir do branch `cursor/installer-smoke-f066`.
 Máquina: Windows 10 Pro 22H2 (build 19045), x64, Visual Studio 2022 (MSVC), CMake 3.23+.
 
 ## 1. Testes automatizados
@@ -12,6 +12,15 @@ Comando: `scripts\build-release.ps1` (roda `pskb_tests.exe` antes de empacotar).
 - Cobertura: mapeamento de teclas e gatilhos, mouse para analógico (zona morta, curva, aceleração, retorno ao centro, sensibilidade de câmera e de mira), edição de teclas por perfil (validação, conflitos, restaurar padrão), perfis, estado do link e reconexão (com backend simulado, incluindo a espera sem rede), captura e gate de entrada, pareamento e armazenamento DPAPI, configurações (incluindo suavização e curva), normalização de PIN, status do app e etapas do assistente, detecção do Veyra, detecção de outro cliente de Remote Play, versão do Windows (Supported, Untested, Unsupported).
 
 Os testes não usam PS5 nem rede.
+
+### Teste de fumaça do instalador e do zip
+
+`scripts\build-release.ps1` também testa os artefatos empacotados:
+
+- Instala o instalador em silêncio em uma pasta temporária (sem atalho na área de trabalho), roda `PS5KeyboardBridge.exe --self-test` no app instalado e desinstala em silêncio. Confere que o registro de desinstalação, a pasta do menu Iniciar e a pasta temporária foram removidos.
+- Extrai o zip portátil em uma pasta temporária e roda o mesmo `--self-test`.
+- O `--self-test` confere a versão do Windows, a presença dos arquivos incluídos (`ps5kb-cli.exe`, licença, avisos, guias), que as configurações carregam e que a janela principal pode ser criada. Não mostra a janela, não inicia conexão nem captura e não grava nada.
+- Se já houver uma instalação do app para o usuário, o teste se recusa a rodar, para não sobrescrever a entrada de desinstalação e os atalhos dela. Use `-SkipSmokeTest` para pular.
 
 ## 2. Build reproduzível
 
