@@ -15,16 +15,59 @@
 
 #include "backend/chiaki_backend.h"
 #include "backend/chiaki_discovery.h"
+#include "backend/psn_signin.h"
 #include "core/account_id.h"
 #include "core/app_paths.h"
 #include "core/bindings.h"
 #include "core/link_manager.h"
 #include "core/pairing.h"
+#include "core/psn_login.h"
 #include "core/secure_store.h"
 
 namespace {
 
 using namespace pskb;
+
+std::string Trim(std::string text) {
+    const auto first = text.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return {};
+    const auto last = text.find_last_not_of(" \t\r\n");
+    return text.substr(first, last - first + 1);
+}
+
+std::string ReadLine(const char* prompt) {
+    std::printf("%s", prompt);
+    std::fflush(stdout);
+    std::string line;
+    std::getline(std::cin, line);
+    return Trim(line);
+}
+
+std::optional<AccountId> RunSignIn() {
+    std::printf(
+        "\nLogin na Sony (pelo navegador)\n"
+        "  1. Pressione Enter: a página de login oficial da Sony abre no seu navegador.\n"
+        "  2. Entre com a mesma conta PSN que você usa neste PS5. A senha fica só no site da Sony.\n"
+        "  3. Quando a página mostrar \"redirect\", copie a URL inteira da barra de endereços e cole aqui.\n\n");
+    ReadLine("Pressione Enter para abrir o navegador... ");
+    if (!psn_signin::OpenSignInPage()) {
+        std::printf("Não consegui abrir o navegador. Abra este endereço manualmente:\n%s\n",
+                    psn_login::SignInUrl().c_str());
+    }
+
+    std::string pasted = ReadLine("URL colada (redirect): ");
+    const auto result = psn_signin::CompleteSignIn(pasted);
+    if (!pasted.empty()) SecureZeroMemory(pasted.data(), pasted.size());
+    std::printf("%s\n", result.message.c_str());
+    if (!result.ok) return std::nullopt;
+
+    std::printf("ID da conta PSN: %s\n", psn_login::AccountIdToBase64(result.account).c_str());
+    return result.account;
+}
+
+int CmdPsnLogin() {
+    return RunSignIn() ? 0 : 1;
+}
 
 std::string Arg(const std::vector<std::string>& args, const std::string& name) {
     for (size_t i = 0; i + 1 < args.size(); ++i) {
@@ -51,7 +94,8 @@ void PrintUsage() {
         "ps5kb-cli <command>\n"
         "  status                          show saved pairing (no secrets)\n"
         "  discover [--host IP] [--seconds N]  find PS5 consoles on the LAN (no pairing)\n"
-        "  pair --host IP [--account ID] [--pin 12345678]  one-time pairing\n"
+        "  psn-login                       sign in to Sony in the browser and show your account ID\n"
+        "  pair [--host IP] [--account ID] one-time pairing (asks for the PS5 code)\n"
         "  connect [--seconds N] [--test-buttons]  input-only session with saved pairing\n"
         "  forget                          delete the saved pairing\n"
         "  bindings                        print the default GTA 6 mapping\n"
@@ -86,22 +130,43 @@ int CmdDiscover(const std::vector<std::string>& args) {
 }
 
 int CmdPair(const std::vector<std::string>& args) {
-    const std::string host = Arg(args, "--host");
-    std::string accountText = Arg(args, "--account");
-    std::string pin = Arg(args, "--pin");
-    if (accountText.empty()) {
-        std::printf("ID da conta PSN (base64 de 12 caracteres ou número): ");
-        std::getline(std::cin, accountText);
+    std::string host = Arg(args, "--host");
+    if (host.empty()) {
+        std::printf("Procurando o PS5 na rede...\n");
+        const auto found = ProbeConsoles("", 4000, nullptr);
+        std::vector<ConsoleInfo> ps5s;
+        for (const auto& c : found) {
+            if (c.isPs5) ps5s.push_back(c);
+        }
+        if (ps5s.empty()) {
+            std::printf("Nenhum PS5 respondeu. Ligue o PS5 (ou deixe-o em repouso com \"Ligar pela rede\") e tente de novo.\n");
+            return 1;
+        }
+        if (ps5s.size() > 1) {
+            std::printf("Encontrei mais de um PS5. Use --host com o IP correto:\n");
+            for (const auto& c : ps5s) std::printf("  %s  %s\n", c.host.c_str(), c.name.c_str());
+            return 2;
+        }
+        host = ps5s.front().host;
+        std::printf("PS5 encontrado: %s em %s\n", ps5s.front().name.c_str(), host.c_str());
     }
-    if (pin.empty()) {
-        std::printf("Código de 8 dígitos do PS5: ");
-        std::getline(std::cin, pin);
+
+    std::optional<AccountId> account;
+    if (const std::string accountText = Arg(args, "--account"); !accountText.empty()) {
+        account = ParseAccountId(accountText);
+        if (!account) {
+            std::printf("ID da conta inválido. Use o número ou o código de 12 caracteres.\n");
+            return 2;
+        }
+    } else {
+        account = RunSignIn();
+        if (!account) return 2;
     }
-    const auto account = ParseAccountId(accountText);
-    if (!account) {
-        std::printf("ID da conta inválido.\n");
-        return 2;
-    }
+
+    std::printf(
+        "\nAgora, no PS5: Configurações > Sistema > Remote Play > Link Device.\n"
+        "A tela mostra um código de 8 dígitos que vale por alguns minutos.\n");
+    const std::string pin = ReadLine("Código de 8 dígitos do PS5: ");
 
     const auto result = chiaki_backend::RegisterConsole(host, *account, pin);
     std::printf("%s\n", result.message.c_str());
@@ -199,6 +264,7 @@ int wmain(int argc, wchar_t** argv) {
     const std::vector<std::string> rest(args.begin() + 1, args.end());
     if (cmd == "status") return CmdStatus();
     if (cmd == "discover") return CmdDiscover(rest);
+    if (cmd == "psn-login") return CmdPsnLogin();
     if (cmd == "pair") return CmdPair(rest);
     if (cmd == "connect") return CmdConnect(rest);
     if (cmd == "forget") return CmdForget();
