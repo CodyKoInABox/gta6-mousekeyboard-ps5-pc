@@ -281,13 +281,21 @@ int CmdPlay(const std::vector<std::string>& args) {
     });
 
     std::atomic<unsigned long long> framesWithInput{0};
+    InputBridge* bridgeForListener = nullptr;
     InputBridge bridge(
         profile, options,
         [&](const PadState& state) {
             if (!dryRun) link.SubmitPad(state);
             if (!state.IsNeutral()) ++framesWithInput;
         },
-        [](CaptureMode mode) { std::printf("[captura] %s\n", CaptureModeText(mode)); });
+        [&](CaptureMode mode) {
+            if (mode == CaptureMode::Active && bridgeForListener && !bridgeForListener->SuppressionInstalled()) {
+                std::printf("[captura] ativa (AVISO: bloqueio de teclas indisponível; o Veyra ainda recebe a entrada)\n");
+                return;
+            }
+            std::printf("[captura] %s\n", CaptureModeText(mode));
+        });
+    bridgeForListener = &bridge;
 
     std::string error;
     if (!bridge.Start(&error)) {

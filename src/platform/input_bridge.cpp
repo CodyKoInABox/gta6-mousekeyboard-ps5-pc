@@ -45,6 +45,11 @@ constexpr ButtonMap kButtons[] = {
     {RI_MOUSE_BUTTON_5_DOWN, RI_MOUSE_BUTTON_5_UP, kMouseX2},
 };
 
+// Low-level hook callbacks receive no user pointer, and the hooks run on the bridge thread.
+InputBridge* g_hookOwner = nullptr;
+
+bool KeyHeld(int virtualKey) { return (GetAsyncKeyState(virtualKey) & 0x8000) != 0; }
+
 }  // namespace
 
 InputBridge::InputBridge(const Profile& profile, CaptureOptions options, PadSink sink, ModeListener onMode)
@@ -52,7 +57,9 @@ InputBridge::InputBridge(const Profile& profile, CaptureOptions options, PadSink
       sink_(std::move(sink)),
       onMode_(std::move(onMode)),
       engine_(profile),
-      session_(engine_, options_.hotkey) {}
+      session_(engine_, options_.hotkey) {
+    for (const Binding& binding : engine_.CurrentProfile().bindings) mapped_.insert(binding.input);
+}
 
 InputBridge::~InputBridge() { Stop(); }
 
@@ -118,6 +125,7 @@ void InputBridge::Run(std::promise<std::string>& ready) {
     }
 
     hwnd_ = window;
+    g_hookOwner = this;
     timeBeginPeriod(1);
     ready.set_value("");
 
@@ -134,8 +142,12 @@ void InputBridge::Run(std::promise<std::string>& ready) {
     session_.Disarm();
     const PadState neutral = session_.Tick(NowMs());
     if (sink_) sink_(neutral);
+    RemoveSuppression();
+    ReleaseCursorLock();
     if (mode_.exchange(CaptureMode::Off) != CaptureMode::Off && onMode_) onMode_(CaptureMode::Off);
 
+    g_hookOwner = nullptr;
+    approved_ = false;
     timeEndPeriod(1);
     RAWINPUTDEVICE remove[2] = {
         {0x01, 0x06, RIDEV_REMOVE, nullptr},
@@ -225,20 +237,182 @@ bool InputBridge::IsApprovedWindow(HWND window) const {
     return ok && ProcessNameMatches(std::wstring_view(path, length), options_.approvedProcess);
 }
 
-void InputBridge::Tick() {
+void InputBridge::RefreshForeground() {
     const HWND foreground = GetForegroundWindow();
-    if (foreground != lastForeground_) {
-        lastForeground_ = foreground;
-        session_.SetGameFocused(IsApprovedWindow(foreground));
-    }
+    if (foreground == lastForeground_) return;
+    lastForeground_ = foreground;
+    approved_ = IsApprovedWindow(foreground);
+    session_.SetGameFocused(approved_);
+}
+
+void InputBridge::Tick() {
+    RefreshForeground();
 
     const PadState state = session_.Tick(NowMs());
     if (sink_) sink_(state);
+
+    SyncSuppression();
 
     const CaptureMode mode = session_.Mode();
     if (mode != mode_.load()) {
         mode_.store(mode);
         if (onMode_) onMode_(mode);
+    }
+}
+
+LRESULT CALLBACK InputBridge::KeyboardHookProc(int code, WPARAM wParam, LPARAM lParam) {
+    if (code == HC_ACTION && g_hookOwner) {
+        const auto* key = reinterpret_cast<const KBDLLHOOKSTRUCT*>(lParam);
+        if (g_hookOwner->OnKeyboardHook(*key, wParam)) return 1;
+    }
+    return CallNextHookEx(nullptr, code, wParam, lParam);
+}
+
+LRESULT CALLBACK InputBridge::MouseHookProc(int code, WPARAM wParam, LPARAM lParam) {
+    if (code == HC_ACTION && g_hookOwner) {
+        const auto* mouse = reinterpret_cast<const MSLLHOOKSTRUCT*>(lParam);
+        if (g_hookOwner->OnMouseHook(*mouse, wParam)) return 1;
+    }
+    return CallNextHookEx(nullptr, code, wParam, lParam);
+}
+
+GateEvent InputBridge::MakeGateEvent(InputCode code, bool down, bool keyboard, bool injected) const {
+    GateEvent event;
+    event.keyboard = keyboard;
+    event.down = down;
+    event.code = code;
+    event.injected = injected;
+    event.altHeld = KeyHeld(VK_MENU);
+    event.ctrlHeld = KeyHeld(VK_CONTROL);
+    event.winHeld = KeyHeld(VK_LWIN) || KeyHeld(VK_RWIN);
+    event.reserved = code == options_.hotkey;
+    event.mapped = mapped_.count(code) != 0;
+    return event;
+}
+
+bool InputBridge::OnKeyboardHook(const KBDLLHOOKSTRUCT& key, WPARAM message) {
+    const bool down = message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
+    const auto code = static_cast<InputCode>(key.vkCode);
+    RefreshForeground();
+
+    const CaptureMode mode = session_.Mode();
+    const GateEvent event = MakeGateEvent(code, down, true, (key.flags & LLKHF_INJECTED) != 0);
+    bool swallow = false;
+    if (!down) {
+        swallow = swallowed_.Consume(code);
+    } else if (ShouldSwallow(event, mode, approved_)) {
+        swallowed_.Remember(code);
+        swallow = true;
+    }
+
+    if (mode == CaptureMode::Active && approved_ && !event.reserved && (event.mapped || code == CaptureSession::kEscape)) {
+        session_.OnKey(code, down);
+    }
+    if (session_.Mode() != CaptureMode::Active) SyncSuppression();
+    return swallow;
+}
+
+bool InputBridge::OnMouseHook(const MSLLHOOKSTRUCT& mouse, WPARAM message) {
+    InputCode code = 0;
+    bool down = false;
+    bool wheel = false;
+    switch (message) {
+        case WM_LBUTTONDOWN: code = kMouseLeft; down = true; break;
+        case WM_LBUTTONUP: code = kMouseLeft; break;
+        case WM_RBUTTONDOWN: code = kMouseRight; down = true; break;
+        case WM_RBUTTONUP: code = kMouseRight; break;
+        case WM_MBUTTONDOWN: code = kMouseMiddle; down = true; break;
+        case WM_MBUTTONUP: code = kMouseMiddle; break;
+        case WM_XBUTTONDOWN:
+        case WM_XBUTTONUP:
+            code = HIWORD(mouse.mouseData) == XBUTTON1 ? kMouseX1 : kMouseX2;
+            down = message == WM_XBUTTONDOWN;
+            break;
+        case WM_MOUSEWHEEL:
+        case WM_MOUSEHWHEEL:
+            code = kMouseWheel;
+            down = true;
+            wheel = true;
+            break;
+        default:
+            return false;
+    }
+    RefreshForeground();
+
+    const CaptureMode mode = session_.Mode();
+    const GateEvent event = MakeGateEvent(code, down, false, (mouse.flags & LLMHF_INJECTED) != 0);
+    bool swallow = false;
+    if (wheel) {
+        swallow = ShouldSwallow(event, mode, approved_);
+    } else if (!down) {
+        swallow = swallowed_.Consume(code);
+    } else if (ShouldSwallow(event, mode, approved_)) {
+        swallowed_.Remember(code);
+        swallow = true;
+    }
+
+    if (!wheel && mode == CaptureMode::Active && approved_) session_.OnMouseButton(code, down);
+    if (session_.Mode() != CaptureMode::Active) SyncSuppression();
+    return swallow;
+}
+
+void InputBridge::SyncSuppression() {
+    if (session_.Mode() != CaptureMode::Active) {
+        RemoveSuppression();
+        ReleaseCursorLock();
+        return;
+    }
+
+    if (!keyHook_) {
+        keyHook_ = SetWindowsHookExW(WH_KEYBOARD_LL, &InputBridge::KeyboardHookProc, GetModuleHandleW(nullptr), 0);
+    }
+    if (!mouseHook_) {
+        mouseHook_ = SetWindowsHookExW(WH_MOUSE_LL, &InputBridge::MouseHookProc, GetModuleHandleW(nullptr), 0);
+    }
+    suppressionInstalled_.store(keyHook_ != nullptr && mouseHook_ != nullptr);
+    ApplyCursorLock(lastForeground_);
+}
+
+void InputBridge::RemoveSuppression() {
+    if (keyHook_) {
+        UnhookWindowsHookEx(keyHook_);
+        keyHook_ = nullptr;
+    }
+    if (mouseHook_) {
+        UnhookWindowsHookEx(mouseHook_);
+        mouseHook_ = nullptr;
+    }
+    suppressionInstalled_.store(false);
+    swallowed_.Clear();
+}
+
+void InputBridge::ApplyCursorLock(HWND window) {
+    RECT rect{};
+    if (!window || !GetWindowRect(window, &rect)) {
+        ReleaseCursorLock();
+        return;
+    }
+    if (!clipped_ || !EqualRect(&rect, &clipRect_)) {
+        if (ClipCursor(&rect)) {
+            clipRect_ = rect;
+            clipped_ = true;
+        }
+    }
+    if (!cursorHidden_) {
+        ShowCursor(FALSE);
+        cursorHidden_ = true;
+    }
+}
+
+void InputBridge::ReleaseCursorLock() {
+    if (clipped_) {
+        ClipCursor(nullptr);
+        clipped_ = false;
+        clipRect_ = {};
+    }
+    if (cursorHidden_) {
+        ShowCursor(TRUE);
+        cursorHidden_ = false;
     }
 }
 

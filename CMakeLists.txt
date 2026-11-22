@@ -32,6 +32,7 @@ add_library(pskb_core STATIC
   src/core/link_manager.cpp
   src/core/raw_keys.cpp
   src/core/capture_session.cpp
+  src/core/input_gate.cpp
   src/core/process_match.cpp
 )
 target_include_directories(pskb_core PUBLIC src)
@@ -83,6 +84,7 @@ if(PSKB_BUILD_TESTS)
     tests/test_raw_keys.cpp
     tests/test_process_match.cpp
     tests/test_capture_session.cpp
+    tests/test_input_gate.cpp
     tests/test_input_bridge.cpp
   )
   target_compile_options(pskb_tests PRIVATE /W4 /utf-8 /permissive-)
