@@ -23,6 +23,24 @@ O PS5 só aceita uma sessão de Remote Play por vez. Feche:
 
 Depois clique em **JOGAR** de novo. Se continuar, reinicie a sessão de Remote Play no PS5 ou reinicie o PS5.
 
+## "Outro app de Remote Play está aberto" (aviso antes de jogar)
+
+Ao clicar em **JOGAR**, o app procura processos de Remote Play abertos no PC (PS Remote Play e Chiaki) antes de conectar. Se achar algum, mostra o nome dele e pergunta se você quer continuar.
+
+- Feche o outro app e clique em **JOGAR** de novo. É o caminho certo na maioria dos casos.
+- Se você sabe que o outro app não está conectado ao PS5, escolha **Sim** para tentar mesmo assim.
+
+O app não consegue ver sessões de Remote Play abertos no celular. Se a conexão for recusada, feche o Remote Play do celular também.
+
+## Status "Sem rede" ("Sem conexão de rede. Verifique o Wi-Fi ou o cabo; o app tenta de novo sozinho.")
+
+O PC não tem uma conexão de rede utilizável. O app não tenta conectar sem rede: ele confere de novo a cada 3 segundos e retoma sozinho quando o Wi-Fi ou o cabo voltar.
+
+Se o status não sair de "Sem rede" com a rede ligada:
+
+- confira se o Windows tem um endereço IPv4 válido. No PowerShell, rode `ipconfig` e procure **Endereço IPv4** no adaptador que você usa. Um endereço `169.254.x.x` indica que o Windows não recebeu IP do roteador, então conta como sem rede;
+- desative e ative o adaptador de rede, ou reconecte o Wi-Fi.
+
 ## "Não foi possível conectar ao PS5 pela rede. Confira se o PS5 e o PC estão na mesma rede."
 
 - Teste se o PC enxerga o PS5: no PowerShell, rode `ping <IP do PS5>`.
@@ -85,7 +103,8 @@ Se a captura ficou presa, pressione **Esc** ou **F8**. Quando o app fecha, o Win
 
 ## A mira no jogo está muito lenta, rápida ou tremida
 
-- Abra **Configurações > Ajustes avançados de mira** e ajuste a sensibilidade (X e Y separados).
+- Abra **Configurações > Ajustes avançados de mira** e ajuste a sensibilidade. A câmera (sem mirar) e a mira com L2 têm valores separados.
+- Se a mira ficar tremida, aumente a suavização (ms) aos poucos. Se ela atrasar demais, diminua.
 - Zona morta alta demais faz o analógico ficar parado com movimentos pequenos.
 - Alguns jogos limitam a velocidade de giro do analógico direito. Isso acontece no jogo, não no app.
 
@@ -95,9 +114,13 @@ O instalador ainda não tem assinatura digital. Clique em **Mais informações**
 
 ## Windows 10
 
-- Requisito: Windows 10 ou 11 de 64 bits. Se o Windows for mais antigo, o assistente avisa "Este app precisa do Windows 10 ou 11".
-- O app foi testado no Windows 10 (build 19045, versão 22H2). Outras versões do Windows 10 ainda não foram testadas.
-- Se algum recurso não funcionar no seu Windows 10, abra uma issue com a versão exata (`winver`).
+Para ver a versão exata, aperte Win+R, digite `winver` e Enter. O número da build aparece na janela.
+
+- **Windows 11, ou Windows 10 build 17763 (versão 1809) ou mais nova**: compatível. O app foi testado no Windows 10 build 19045 (versão 22H2).
+- **Windows 10 anterior à build 17763**: o app abre e mostra o aviso "Windows 10 build N é anterior ao 1809 ... e não foi testado". Pode funcionar. Se algo falhar, atualize o Windows em **Configurações > Atualização e Segurança**, e abra uma issue com a versão exata.
+- **Windows 8.1 ou anterior, ou Windows de 32 bits**: o app não abre e mostra "Este app precisa de Windows 10 ou 11 de 64 bits."
+
+O assistente mostra o mesmo status na tela de boas-vindas.
 
 ## Onde ficam os dados
 

@@ -71,7 +71,8 @@ Teste com o jogo aberto, no Veyra em tela cheia se possível.
 ## G. Perfis e mira
 
 - [ ] Perfil "Dirigir (volante suave)": W/S viram gatilhos e A/D suavizam o volante.
-- [ ] Ajustes avançados de mira: a sensibilidade X e Y muda a mira de forma independente.
+- [ ] Ajustes avançados de mira: Câmera X/Y muda o movimento sem mirar; Mira (L2) X/Y só muda com L2 segurado. Suavização e curva exponencial mudam a resposta, e o texto de limites aparece na seção.
+- [ ] Editar teclas (Configurações > Editar teclas...): trocar uma tecla e jogar com ela; Esc cancela a troca; a tecla Windows e F8 são recusadas com aviso; Restaurar padrão volta o perfil. Teste sem jogo aberto e com o Veyra fechado.
 - [ ] Zona morta alta faz o analógico parar com movimentos pequenos.
 
 ## H. Veyra
@@ -94,7 +95,8 @@ Teste com o jogo aberto, no Veyra em tela cheia se possível.
 
 ## K. Outros Remote Play
 
-- [ ] Com o PS Remote Play aberto no PC, JOGAR mostra o aviso "Outro app de Remote Play está aberto". (Disponível a partir da versão com a verificação de conflito.)
+- [ ] Com o PS Remote Play aberto no PC, JOGAR mostra o aviso "Outro app de Remote Play está aberto". "Não" cancela e "Sim" tenta conectar.
+- [ ] Com a rede desligada (Wi-Fi ou cabo desconectado) e o app em JOGAR, o status vira "Sem rede" e o app não entra em erro. Religar a rede retoma a conexão. Teste curto, religando logo depois.
 - [ ] Com outro cliente conectado ao PS5, a conexão falha com "Outro Remote Play ... já está conectado". Feche o outro app e a conexão volta.
 
 ## Relatório

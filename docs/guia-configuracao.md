@@ -7,7 +7,7 @@ A imagem continua indo para a sua capturadora (Ripsaw) e para o Veyra NRVideo, c
 
 ## 1. O que você precisa
 
-- PC com Windows 10 ou Windows 11, 64 bits. O app foi testado no Windows 10 (build 19045).
+- PC com Windows 10 ou Windows 11, 64 bits. O app foi testado no Windows 10 (build 19045). Windows 10 anterior à versão 1809 (build 17763) abre com um aviso, porque não foi testado. Veja `solucao-de-problemas.md`, seção "Windows 10".
 - PS5 e PC na mesma rede (de preferência cabo ou Wi-Fi estável).
 - A conta PSN que você usa no PS5, com a senha à mão (ela só é digitada no site da Sony).
 - O Veyra NRVideo instalado, se você quer ver a imagem da capturadora no PC.
@@ -94,13 +94,39 @@ Enquanto a captura está ativa, o app bloqueia as teclas e o clique para o Veyra
 
 O perfil **Dirigir (volante suave)** troca W/S por gatilhos e suaviza o volante com A/D.
 
+### Trocar as teclas
+
+Em **Configurações > Editar teclas...**:
+
+- escolha o perfil no topo;
+- selecione uma linha e clique em **Alterar tecla**, ou escolha uma ação na lista de baixo e clique em **Adicionar tecla**;
+- pressione a tecla ou clique com o botão do mouse (esquerdo, direito ou do meio).
+
+**Remover** tira uma linha (o perfil sempre fica com pelo menos uma tecla). **Restaurar padrão** volta o perfil escolhido ao original.
+
+Cada perfil guarda as suas teclas. As mudanças valem na próxima vez que você clicar em **JOGAR**.
+
+Não dá para usar Esc (ele cancela a troca e solta tudo durante o jogo), a tecla Windows, a tecla que liga e desliga a captura (F8 por padrão), os botões laterais do mouse, nem teclas sem nome estável. O app avisa o motivo na tela.
+
+Se você atribuir uma tecla que já era de outra ação, ela sai da ação antiga. O app mostra o que mudou.
+
 ### Sobre a mira com o mouse
 
 O mouse não é um analógico. O app converte o movimento do mouse em movimento do analógico direito, com limites:
 
 - O analógico tem alcance máximo. Movimentos rápidos e longos do mouse chegam ao limite e não viram mais movimento.
 - Os jogos aplicam suas próprias curvas de mira e limites de velocidade de giro. Isso pode fazer a mira parecer mais lenta ou mais rápida que no PC.
-- Ajuste a sensibilidade e a zona morta em **Configurações > Ajustes avançados de mira**. Mexer nelas só é necessário se a mira estiver fora do seu gosto.
+
+Ajuste em **Configurações > Ajustes avançados de mira**:
+
+- **Câmera X / Y**: sensibilidade do movimento sem mirar.
+- **Mira (L2) X / Y**: sensibilidade enquanto você segura o botão de mira (L2; clique direito no perfil GTA 6).
+- **Zona morta** e **Zona anti-morta**: ignoram tremidas pequenas e fazem o analógico responder logo ao primeiro movimento.
+- **Aceleração**: aumenta o giro em movimentos rápidos.
+- **Suavização (ms)**: suaviza a resposta; valores altos atrasam a mira. 0 desliga.
+- **Curva exponencial** e **Expoente**: deixa a resposta mais fina perto do centro. Expoente 1 é linear; valores maiores deixam o centro mais preciso.
+
+Mexer nesses ajustes só é necessário se a mira estiver fora do seu gosto.
 
 ## 6. Configurações
 
@@ -113,7 +139,8 @@ Abra **Configurações** na tela principal.
 - **Reconectar automaticamente**: tenta de novo se a conexão cair.
 - **Minimizar para a bandeja**: fechar a janela deixa o app rodando perto do relógio.
 - **Abrir o Veyra ao jogar**: abre o Veyra ou traz a janela dele para frente.
-- **Ajustes avançados de mira**: sensibilidade, zona morta, anti-zona morta, aceleração e inverter o eixo Y. Deixe escondido se não quiser mexer.
+- **Editar teclas...**: troca as teclas de cada perfil (veja "Trocar as teclas" na seção 5).
+- **Ajustes avançados de mira**: câmera e mira separadas, zona morta, anti-zona morta, aceleração, suavização, curva exponencial e inverter o eixo Y. Deixe escondido se não quiser mexer.
 - **Esquecer PS5**: apaga o pareamento salvo.
 
 ## 7. Onde ficam os dados
