@@ -12,6 +12,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Static CRT: one self-contained exe, no VC++ redistributable needed on the user's PC.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
+# /Brepro: the PE timestamp comes from a content hash, so identical sources give identical binaries.
+if(MSVC)
+  add_link_options($<$<CONFIG:Release>:/Brepro>)
+endif()
+
 option(PSKB_BUILD_TESTS "Build the offline test suite" ON)
 
 # Remote Play protocol core (chiaki-ng, LAN only). See third_party/README.md.
