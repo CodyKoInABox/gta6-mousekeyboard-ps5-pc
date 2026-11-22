@@ -13,6 +13,14 @@ kept in `third_party/` and must stay with any copy of this project.
 | Jerasure | Remote Play FEC | BSD-3-Clause | <https://github.com/streetpea/jerasure> | `third_party/jerasure/COPYING` |
 | GF-Complete | Galois-field maths for Jerasure | BSD-3-Clause | <https://github.com/streetpea/gf-complete> | `third_party/gf-complete/COPYING` |
 
+## Sony sign-in constants
+
+`src/core/psn_login.h` contains the public Remote Play client ID and client secret that
+chiaki-ng (`scripts/psn-account-id.py`, `gui/include/psnaccountid.h`) and the official Remote Play
+client use for the Sony sign-in flow. They are copied from chiaki-ng, not issued to this project.
+They identify the client to Sony and do not give access to any account on their own. A user's
+password is only entered on Sony's page, never in this app.
+
 ## Source availability
 
 The complete corresponding source of this project, including the vendored components above,

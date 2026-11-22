@@ -38,8 +38,11 @@ app detects the PS5 being busy and reports it instead of opening a second sessio
   `third_party/README.md`).
 - The PS5 stream must still be negotiated, so A/V packets arrive and are discarded. This costs
   some bandwidth but adds no decode work.
-- PSN sign-in through Sony's browser flow needs an OAuth client ID that is not shipped with this
-  project. v1 asks for the PSN account ID manually. The app never asks for a PSN password.
+- PSN sign-in uses Sony's own browser login (the flow chiaki-ng uses). The app ships the public
+  Remote Play client ID and secret that chiaki-ng ships (`src/core/psn_login.h`). They identify the
+  client to Sony and grant nothing by themselves. The user's password is only ever typed on Sony's
+  page. The app receives the one-time `redirect` code, exchanges it, and discards the token.
+  Manual account-ID entry remains available in `ps5kb-cli pair --account`.
 - If the PS5 user has a login passcode, the protocol cannot complete. The app reports this as a
   fatal, actionable error instead of retrying.
 - Mouse-to-stick translation is an analog emulation. The game's own stick acceleration and
