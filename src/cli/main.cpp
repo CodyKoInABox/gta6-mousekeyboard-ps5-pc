@@ -26,6 +26,7 @@
 #include "core/psn_login.h"
 #include "core/secure_store.h"
 #include "platform/input_bridge.h"
+#include "platform/veyra_locator.h"
 
 namespace {
 
@@ -103,6 +104,7 @@ void PrintUsage() {
         "  pair [--host IP] [--account ID] one-time pairing (asks for the PS5 code)\n"
         "  connect [--seconds N] [--test-buttons]  input-only session with saved pairing\n"
         "  forget                          delete the saved pairing\n"
+        "  veyra                           find Veyra.exe (running or installed)\n"
         "  bindings                        print the default GTA 6 mapping\n"
         "  log                             print recent protocol log lines\n");
 }
@@ -335,6 +337,16 @@ int CmdPlay(const std::vector<std::string>& args) {
     return 0;
 }
 
+int CmdVeyra() {
+    const auto path = FindVeyraExecutable();
+    if (!path) {
+        std::printf("Veyra.exe não encontrado. Escolha o arquivo em Configurações no app.\n");
+        return 1;
+    }
+    std::printf("%ls\n", path->c_str());
+    return 0;
+}
+
 int CmdForget() {
     std::error_code ec;
     const bool removed = std::filesystem::remove(PairingFilePath(), ec);
@@ -376,6 +388,7 @@ int wmain(int argc, wchar_t** argv) {
     if (cmd == "pair") return CmdPair(rest);
     if (cmd == "connect") return CmdConnect(rest);
     if (cmd == "forget") return CmdForget();
+    if (cmd == "veyra") return CmdVeyra();
     if (cmd == "bindings") return CmdBindings();
     if (cmd == "log") return CmdLog();
     PrintUsage();

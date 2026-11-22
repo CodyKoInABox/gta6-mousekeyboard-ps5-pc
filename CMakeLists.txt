@@ -34,6 +34,7 @@ add_library(pskb_core STATIC
   src/core/capture_session.cpp
   src/core/input_gate.cpp
   src/core/process_match.cpp
+  src/core/app_model.cpp
 )
 target_include_directories(pskb_core PUBLIC src)
 target_compile_options(pskb_core PRIVATE /W4 /utf-8 /permissive-)
@@ -54,6 +55,7 @@ target_link_libraries(pskb_backend PUBLIC pskb_core chiaki_core)
 # Win32 input: Raw Input observation, foreground gate, window tracking.
 add_library(pskb_platform STATIC
   src/platform/input_bridge.cpp
+  src/platform/veyra_locator.cpp
 )
 target_include_directories(pskb_platform PUBLIC src)
 target_compile_options(pskb_platform PRIVATE /W4 /utf-8 /permissive-)
@@ -65,6 +67,21 @@ target_compile_options(pskb_cli PRIVATE /W4 /utf-8 /permissive-)
 target_compile_definitions(pskb_cli PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(pskb_cli PRIVATE pskb_core pskb_backend pskb_platform)
 set_target_properties(pskb_cli PROPERTIES OUTPUT_NAME "ps5kb-cli")
+
+# The windowed app: setup wizard, main screen, tray, and settings. Pt-BR, dark theme, native Win32.
+add_executable(pskb_app WIN32
+  src/app/main.cpp
+  src/app/ui.cpp
+  src/app/saved_pairing.cpp
+  src/app/app_controller.cpp
+  src/app/main_window.cpp
+  src/app/setup_wizard.cpp
+  src/app/settings_window.cpp
+)
+target_compile_options(pskb_app PRIVATE /W4 /utf-8 /permissive-)
+target_compile_definitions(pskb_app PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(pskb_app PRIVATE pskb_core pskb_backend pskb_platform comdlg32 shell32 user32 gdi32)
+set_target_properties(pskb_app PROPERTIES OUTPUT_NAME "PS5KeyboardBridge")
 
 if(PSKB_BUILD_TESTS)
   enable_testing()
@@ -85,6 +102,7 @@ if(PSKB_BUILD_TESTS)
     tests/test_process_match.cpp
     tests/test_capture_session.cpp
     tests/test_input_gate.cpp
+    tests/test_app_model.cpp
     tests/test_input_bridge.cpp
   )
   target_compile_options(pskb_tests PRIVATE /W4 /utf-8 /permissive-)
