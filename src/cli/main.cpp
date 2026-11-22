@@ -3,6 +3,7 @@
 
 #include <windows.h>
 
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -17,12 +18,14 @@
 #include "backend/chiaki_discovery.h"
 #include "backend/psn_signin.h"
 #include "core/account_id.h"
+#include "core/capture_session.h"
 #include "core/app_paths.h"
 #include "core/bindings.h"
 #include "core/link_manager.h"
 #include "core/pairing.h"
 #include "core/psn_login.h"
 #include "core/secure_store.h"
+#include "platform/input_bridge.h"
 
 namespace {
 
@@ -95,6 +98,8 @@ void PrintUsage() {
         "  status                          show saved pairing (no secrets)\n"
         "  discover [--host IP] [--seconds N]  find PS5 consoles on the LAN (no pairing)\n"
         "  psn-login                       sign in to Sony in the browser and show your account ID\n"
+        "  play [--seconds N] [--dry-run] [--app Veyra] [--hotkey F8] [--profile gta6|driving]\n"
+        "                                  capture mouse/keyboard into the PS5 while Veyra has focus\n"
         "  pair [--host IP] [--account ID] one-time pairing (asks for the PS5 code)\n"
         "  connect [--seconds N] [--test-buttons]  input-only session with saved pairing\n"
         "  forget                          delete the saved pairing\n"
@@ -228,6 +233,100 @@ int CmdConnect(const std::vector<std::string>& args) {
     return wasConnected ? 0 : 1;
 }
 
+const char* CaptureModeText(CaptureMode mode) {
+    switch (mode) {
+        case CaptureMode::Off: return "desligada";
+        case CaptureMode::Armed: return "aguardando o Veyra em foco";
+        case CaptureMode::Active: return "ativa";
+    }
+    return "desligada";
+}
+
+std::wstring Utf8ToWide(const std::string& text) {
+    if (text.empty()) return {};
+    const int length = MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+    std::wstring out(static_cast<std::size_t>(length), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), length);
+    return out;
+}
+
+int CmdPlay(const std::vector<std::string>& args) {
+    unsigned seconds = 30;
+    if (const auto s = Arg(args, "--seconds"); !s.empty()) seconds = static_cast<unsigned>(std::stoul(s));
+    const bool dryRun = HasFlag(args, "--dry-run");
+
+    CaptureOptions options;
+    if (const auto app = Arg(args, "--app"); !app.empty()) options.approvedProcess = Utf8ToWide(app);
+    std::string hotkeyName = "F8";
+    if (const auto key = Arg(args, "--hotkey"); !key.empty()) {
+        const auto code = InputCodeFromName(key);
+        if (!code) {
+            std::printf("Atalho desconhecido: %s\n", key.c_str());
+            return 2;
+        }
+        options.hotkey = *code;
+        hotkeyName = key;
+    }
+    const Profile profile = Arg(args, "--profile") == "driving" ? DrivingProfile() : GtaProfile();
+
+    if (!dryRun && !LoadPairing()) {
+        std::printf("Nenhum pareamento salvo. Rode 'pair' primeiro, ou use --dry-run para testar sem o PS5.\n");
+        return 2;
+    }
+
+    ChiakiBackend backend;
+    LinkManager link(backend, [] { return LoadPairing(); });
+    link.SetStatusListener([](const LinkStatus& s) {
+        std::printf("[estado] %s (%s) %s\n", LinkStateName(s.state), LinkErrorName(s.error), s.message.c_str());
+    });
+
+    std::atomic<unsigned long long> framesWithInput{0};
+    InputBridge bridge(
+        profile, options,
+        [&](const PadState& state) {
+            if (!dryRun) link.SubmitPad(state);
+            if (!state.IsNeutral()) ++framesWithInput;
+        },
+        [](CaptureMode mode) { std::printf("[captura] %s\n", CaptureModeText(mode)); });
+
+    std::string error;
+    if (!bridge.Start(&error)) {
+        std::printf("%s\n", error.c_str());
+        return 1;
+    }
+
+    std::printf(
+        "Captura pronta. %s liga e desliga. Esc libera tudo.\n"
+        "Os comandos só valem com a janela do Veyra em foco.\n",
+        hotkeyName.c_str());
+    bool linkReady = dryRun;
+    if (dryRun) {
+        std::printf("(modo de teste: nada é enviado ao PS5)\n");
+        bridge.SetLinkReady(true);
+    } else {
+        link.Connect();
+    }
+
+    const auto end = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
+    while (std::chrono::steady_clock::now() < end) {
+        if (!dryRun) {
+            if (link.Status().state == LinkState::Failed) break;
+            const bool connected = link.IsConnected();
+            if (connected != linkReady) {
+                linkReady = connected;
+                bridge.SetLinkReady(connected);
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+
+    bridge.Stop();
+    if (!dryRun) link.Disconnect();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    std::printf("Captura encerrada. Quadros com entrada: %llu\n", framesWithInput.load());
+    return 0;
+}
+
 int CmdForget() {
     std::error_code ec;
     const bool removed = std::filesystem::remove(PairingFilePath(), ec);
@@ -265,6 +364,7 @@ int wmain(int argc, wchar_t** argv) {
     if (cmd == "status") return CmdStatus();
     if (cmd == "discover") return CmdDiscover(rest);
     if (cmd == "psn-login") return CmdPsnLogin();
+    if (cmd == "play") return CmdPlay(rest);
     if (cmd == "pair") return CmdPair(rest);
     if (cmd == "connect") return CmdConnect(rest);
     if (cmd == "forget") return CmdForget();
