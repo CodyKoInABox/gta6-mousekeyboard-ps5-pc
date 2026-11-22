@@ -6,6 +6,7 @@
 #include "app/saved_pairing.h"
 #include "app/ui.h"
 #include "core/app_model.h"
+#include "platform/remote_play_guard.h"
 
 namespace pskb {
 namespace {
@@ -41,6 +42,7 @@ COLORREF ColorFor(AppStatus status) {
         case AppStatus::Connecting: return ui::kWarn;
         case AppStatus::Connected: return ui::kAccent;
         case AppStatus::Playing: return ui::kGood;
+        case AppStatus::NoNetwork: return ui::kWarn;
         case AppStatus::Error: return ui::kBad;
     }
     return ui::kText;
@@ -135,6 +137,10 @@ void MainWindow::Refresh() {
             hint = "Jogando. F8 liga e desliga a captura; Esc libera tudo.";
             hintColor = ui::kGood;
             break;
+        case AppStatus::NoNetwork:
+            hint = "Sem rede. O app tenta de novo sozinho quando o Wi-Fi ou o cabo voltar.";
+            hintColor = ui::kWarn;
+            break;
         case AppStatus::Error:
             hint = "A conexão parou. Pressione JOGAR para tentar de novo.";
             hintColor = ui::kBad;
@@ -166,7 +172,8 @@ void MainWindow::Refresh() {
             break;
     }
 
-    const std::string linkMessage = status == AppStatus::Error ? app_.StatusMessage() : std::string{};
+    const bool showLinkMessage = status == AppStatus::Error || status == AppStatus::NoNetwork;
+    const std::string linkMessage = showLinkMessage ? app_.StatusMessage() : std::string{};
     ui::SetText(messageLabel_, !lastError_.empty() ? lastError_ : linkMessage);
 }
 
@@ -200,11 +207,33 @@ void MainWindow::OpenSettings() {
         [this] { OpenSetup(); });
 }
 
+namespace {
+
+bool ConfirmNoOtherRemotePlay(HWND owner) {
+    const std::vector<std::wstring> clients = RunningRemotePlayClients();
+    if (clients.empty()) return true;
+
+    std::wstring names;
+    for (const std::wstring& name : clients) {
+        if (!names.empty()) names += L", ";
+        names += name;
+    }
+    const std::wstring text =
+        L"Outro app de Remote Play está aberto: " + names + L".\n\n"
+        L"O PS5 aceita só uma conexão de Remote Play por vez. Se ele já estiver conectado a esse app, "
+        L"a conexão deste aplicativo será recusada.\n\n"
+        L"Continuar mesmo assim?";
+    return MessageBoxW(owner, text.c_str(), L"PS5 Keyboard Bridge", MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) == IDYES;
+}
+
+}  // namespace
+
 void MainWindow::Play() {
     if (!paired_) {
         OpenSetup();
         return;
     }
+    if (!app_.IsPlaying() && !ConfirmNoOtherRemotePlay(hwnd_)) return;
     std::string error;
     lastError_ = app_.StartPlay(&error) ? std::string{} : error;
     Refresh();

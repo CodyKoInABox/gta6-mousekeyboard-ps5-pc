@@ -40,6 +40,8 @@ add_library(pskb_core STATIC
   src/core/input_gate.cpp
   src/core/process_match.cpp
   src/core/app_model.cpp
+  src/core/remote_play_clients.cpp
+  src/core/windows_support.cpp
 )
 target_include_directories(pskb_core PUBLIC src)
 target_compile_options(pskb_core PRIVATE /W4 /utf-8 /permissive-)
@@ -61,11 +63,15 @@ target_link_libraries(pskb_backend PUBLIC pskb_core chiaki_core)
 add_library(pskb_platform STATIC
   src/platform/input_bridge.cpp
   src/platform/veyra_locator.cpp
+  src/platform/process_list.cpp
+  src/platform/remote_play_guard.cpp
+  src/platform/network_status.cpp
+  src/platform/windows_version.cpp
 )
 target_include_directories(pskb_platform PUBLIC src)
 target_compile_options(pskb_platform PRIVATE /W4 /utf-8 /permissive-)
 target_compile_definitions(pskb_platform PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(pskb_platform PUBLIC pskb_core)
+target_link_libraries(pskb_platform PUBLIC pskb_core iphlpapi ws2_32)
 
 add_executable(pskb_cli src/cli/main.cpp)
 target_compile_options(pskb_cli PRIVATE /W4 /utf-8 /permissive-)
@@ -82,6 +88,7 @@ add_executable(pskb_app WIN32
   src/app/main_window.cpp
   src/app/setup_wizard.cpp
   src/app/settings_window.cpp
+  src/app/bindings_window.cpp
 )
 target_compile_options(pskb_app PRIVATE /W4 /utf-8 /permissive-)
 target_compile_definitions(pskb_app PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
@@ -109,6 +116,11 @@ if(PSKB_BUILD_TESTS)
     tests/test_input_gate.cpp
     tests/test_app_model.cpp
     tests/test_input_bridge.cpp
+    tests/test_remote_play_clients.cpp
+    tests/test_windows_support.cpp
+    tests/test_aim_sensitivity.cpp
+    tests/test_bindings_edit.cpp
+    tests/test_settings_audit.cpp
   )
   target_compile_options(pskb_tests PRIVATE /W4 /utf-8 /permissive-)
   target_compile_definitions(pskb_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)

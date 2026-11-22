@@ -45,4 +45,8 @@ bool DrawButton(LPARAM lParam);
 // Creates the dark background brush used as a window class background.
 HBRUSH WindowBackground();
 
+// Window property. While set on a top-level window, the message loop skips IsDialogMessage for
+// it so that Esc and Tab reach the window as ordinary keys (used while capturing a key).
+inline constexpr wchar_t kRawKeysProp[] = L"pskb.rawkeys";
+
 }  // namespace pskb::ui

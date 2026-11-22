@@ -19,7 +19,11 @@ namespace {
 
 constexpr wchar_t kClassName[] = L"PS5KeyboardBridge.Settings";
 constexpr int kWidth = 760;
-constexpr int kHeight = 690;
+constexpr int kHeightCollapsed = 690;
+constexpr int kHeightExpanded = 900;
+constexpr int kBottomCollapsedY = 590;
+constexpr int kBottomExpandedY = 794;
+constexpr int kMessageGap = 56;
 constexpr DWORD kStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
 
 enum Id : int {
@@ -32,6 +36,7 @@ enum Id : int {
     kVeyraDetect,
     kHotkeyLabel,
     kHotkey,
+    kBindings,
     kAutoConnect,
     kAutoReconnect,
     kMinimizeToTray,
@@ -41,6 +46,10 @@ enum Id : int {
     kSensX,
     kSensYLabel,
     kSensY,
+    kAimSensXLabel,
+    kAimSensX,
+    kAimSensYLabel,
+    kAimSensY,
     kDeadzoneLabel,
     kDeadzone,
     kAntiDeadzoneLabel,
@@ -48,6 +57,12 @@ enum Id : int {
     kAccelerationLabel,
     kAcceleration,
     kInvertY,
+    kSmoothLabel,
+    kSmooth,
+    kCurveExpLabel,
+    kCurveExp,
+    kCurve,
+    kAimNote,
     kForget,
     kSetup,
     kCancel,
@@ -58,9 +73,9 @@ enum Id : int {
 constexpr int kProfileGta = 0;
 constexpr int kProfileDriving = 1;
 
-std::string Format(float value) {
+std::string Format(float value, int decimals = 2) {
     char buffer[32];
-    std::snprintf(buffer, sizeof(buffer), "%.2f", static_cast<double>(value));
+    std::snprintf(buffer, sizeof(buffer), "%.*f", decimals, static_cast<double>(value));
     return buffer;
 }
 
@@ -75,17 +90,26 @@ std::optional<float> ParseFloat(std::string text, float low, float high) {
     return value;
 }
 
+void MoveToY(HWND parent, int id, int y) {
+    HWND control = GetDlgItem(parent, id);
+    RECT rect{};
+    GetWindowRect(control, &rect);
+    MapWindowPoints(nullptr, parent, reinterpret_cast<POINT*>(&rect), 2);
+    SetWindowPos(control, nullptr, rect.left, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+}
+
 }  // namespace
 
 SettingsWindow::SettingsWindow(HINSTANCE instance, AppController& app, std::function<void()> onClosed,
                                std::function<void()> onSetup)
-    : app_(app), onClosed_(std::move(onClosed)), onSetup_(std::move(onSetup)) {
+    : instance_(instance), app_(app), onClosed_(std::move(onClosed)), onSetup_(std::move(onSetup)) {
     Create(instance);
     Load();
     Show();
 }
 
 SettingsWindow::~SettingsWindow() {
+    bindings_.reset();
     if (hwnd_) DestroyWindow(hwnd_);
 }
 
@@ -107,7 +131,7 @@ void SettingsWindow::Create(HINSTANCE instance) {
     }();
     if (!registered) return;
 
-    RECT frame{0, 0, kWidth, kHeight};
+    RECT frame{0, 0, kWidth, kHeightCollapsed};
     AdjustWindowRect(&frame, kStyle, FALSE);
     hwnd_ = CreateWindowExW(WS_EX_CONTROLPARENT, kClassName, L"Configurações - PS5 Keyboard Bridge", kStyle,
                             CW_USEDEFAULT, CW_USEDEFAULT, frame.right - frame.left, frame.bottom - frame.top,
@@ -127,7 +151,8 @@ void SettingsWindow::Create(HINSTANCE instance) {
     ui::Button(hwnd_, "Detectar", kVeyraDetect, 620, 154, 100, 34);
 
     ui::Label(hwnd_, "Tecla que liga e desliga a captura", kHotkeyLabel, 40, 208, 400, 24, ui::Font(18));
-    ui::Edit(hwnd_, kHotkey, 460, 204, 120, 30, 16);
+    ui::Edit(hwnd_, kHotkey, 460, 204, 100, 30, 16);
+    ui::Button(hwnd_, "Editar teclas...", kBindings, 572, 202, 148, 34);
 
     ui::Check(hwnd_, "Conectar ao abrir o app", kAutoConnect, 40, 252, 680, 26, false);
     ui::Check(hwnd_, "Reconectar automaticamente se a conexão cair", kAutoReconnect, 40, 286, 680, 26, true);
@@ -137,25 +162,43 @@ void SettingsWindow::Create(HINSTANCE instance) {
     ui::Check(hwnd_, "Mostrar ajustes avançados de mira (só para quem sabe o que faz)", kAdvanced, 40, 400, 680, 28,
               false);
 
-    advanced_.push_back(ui::Label(hwnd_, "Sensibilidade X", kSensXLabel, 40, 444, 200, 24, ui::Font(18)));
-    advanced_.push_back(ui::Edit(hwnd_, kSensX, 260, 440, 120, 30, 12));
-    advanced_.push_back(ui::Label(hwnd_, "Sensibilidade Y", kSensYLabel, 400, 444, 200, 24, ui::Font(18)));
-    advanced_.push_back(ui::Edit(hwnd_, kSensY, 620, 440, 120, 30, 12));
-    advanced_.push_back(ui::Label(hwnd_, "Zona morta (0 a 0,5)", kDeadzoneLabel, 40, 488, 200, 24, ui::Font(18)));
-    advanced_.push_back(ui::Edit(hwnd_, kDeadzone, 260, 484, 120, 30, 12));
-    advanced_.push_back(ui::Label(hwnd_, "Zona anti-morta (0 a 0,5)", kAntiDeadzoneLabel, 400, 488, 210, 24,
+    advanced_.push_back(ui::Label(hwnd_, "Câmera X", kSensXLabel, 40, 440, 215, 24, ui::Font(18)));
+    advanced_.push_back(ui::Edit(hwnd_, kSensX, 260, 436, 120, 30, 12));
+    advanced_.push_back(ui::Label(hwnd_, "Câmera Y", kSensYLabel, 400, 440, 210, 24, ui::Font(18)));
+    advanced_.push_back(ui::Edit(hwnd_, kSensY, 620, 436, 120, 30, 12));
+    advanced_.push_back(ui::Label(hwnd_, "Mira (L2) X", kAimSensXLabel, 40, 480, 215, 24, ui::Font(18)));
+    advanced_.push_back(ui::Edit(hwnd_, kAimSensX, 260, 476, 120, 30, 12));
+    advanced_.push_back(ui::Label(hwnd_, "Mira (L2) Y", kAimSensYLabel, 400, 480, 210, 24, ui::Font(18)));
+    advanced_.push_back(ui::Edit(hwnd_, kAimSensY, 620, 476, 120, 30, 12));
+    advanced_.push_back(ui::Label(hwnd_, "Zona morta (0 a 0,5)", kDeadzoneLabel, 40, 520, 215, 24, ui::Font(18)));
+    advanced_.push_back(ui::Edit(hwnd_, kDeadzone, 260, 516, 120, 30, 12));
+    advanced_.push_back(ui::Label(hwnd_, "Zona anti-morta (0 a 0,5)", kAntiDeadzoneLabel, 400, 520, 210, 24,
                                   ui::Font(18)));
-    advanced_.push_back(ui::Edit(hwnd_, kAntiDeadzone, 620, 484, 120, 30, 12));
-    advanced_.push_back(ui::Label(hwnd_, "Aceleração (0 a 1)", kAccelerationLabel, 40, 532, 200, 24, ui::Font(18)));
-    advanced_.push_back(ui::Edit(hwnd_, kAcceleration, 260, 528, 120, 30, 12));
-    advanced_.push_back(ui::Check(hwnd_, "Inverter eixo Y", kInvertY, 400, 530, 240, 26, false));
-    for (HWND control : advanced_) ShowWindow(control, SW_HIDE);
+    advanced_.push_back(ui::Edit(hwnd_, kAntiDeadzone, 620, 516, 120, 30, 12));
+    advanced_.push_back(ui::Label(hwnd_, "Aceleração (0 a 1)", kAccelerationLabel, 40, 560, 215, 24, ui::Font(18)));
+    advanced_.push_back(ui::Edit(hwnd_, kAcceleration, 260, 556, 120, 30, 12));
+    advanced_.push_back(ui::Check(hwnd_, "Inverter eixo Y", kInvertY, 400, 558, 240, 26, false));
+    advanced_.push_back(ui::Label(hwnd_, "Suavização (ms)", kSmoothLabel, 40, 600, 215, 24, ui::Font(18)));
+    advanced_.push_back(ui::Edit(hwnd_, kSmooth, 260, 596, 120, 30, 12));
+    advanced_.push_back(ui::Label(hwnd_, "Expoente da curva (1 a 3)", kCurveExpLabel, 400, 600, 210, 24, ui::Font(18)));
+    advanced_.push_back(ui::Edit(hwnd_, kCurveExp, 620, 596, 120, 30, 12));
+    advanced_.push_back(ui::Check(hwnd_, "Curva exponencial: mais precisa perto do centro", kCurve, 40, 640, 680, 26,
+                                  false));
+    advanced_.push_back(ui::Label(
+        hwnd_,
+        "O mouse vira o analógico direito. Esse analógico tem limite: passada a inclinação máxima, mover mais "
+        "rápido não inclina mais, e alguns jogos também limitam a velocidade de giro. Se a câmera parecer lenta "
+        "ou rápida demais, ajuste a sensibilidade da câmera. A mira (L2) usa a sensibilidade de mira enquanto você "
+        "segura o botão de mira (botão direito no perfil GTA 6).",
+        kAimNote, 40, 676, 680, 110, ui::Font(16), ui::kMuted));
 
-    ui::Button(hwnd_, "Esquecer PS5", kForget, 40, 590, 170, 44);
-    ui::Button(hwnd_, "Refazer configuração inicial", kSetup, 222, 590, 262, 44);
-    ui::Button(hwnd_, "Cancelar", kCancel, 500, 590, 116, 44);
-    ui::Button(hwnd_, "Salvar", kSave, 626, 590, 114, 44, true);
-    ui::Label(hwnd_, "", kMessage, 40, 646, 680, 24, ui::Font(17), ui::kMuted);
+    ui::Button(hwnd_, "Esquecer PS5", kForget, 40, kBottomCollapsedY, 170, 44);
+    ui::Button(hwnd_, "Refazer configuração inicial", kSetup, 222, kBottomCollapsedY, 262, 44);
+    ui::Button(hwnd_, "Cancelar", kCancel, 500, kBottomCollapsedY, 116, 44);
+    ui::Button(hwnd_, "Salvar", kSave, 626, kBottomCollapsedY, 114, 44, true);
+    ui::Label(hwnd_, "", kMessage, 40, kBottomCollapsedY + kMessageGap, 680, 24, ui::Font(17), ui::kMuted);
+
+    ApplyLayout();
 }
 
 LRESULT CALLBACK SettingsWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -212,10 +255,15 @@ void SettingsWindow::Load() {
 
     ui::SetText(GetDlgItem(hwnd_, kSensX), Format(s.aim.sensitivityX));
     ui::SetText(GetDlgItem(hwnd_, kSensY), Format(s.aim.sensitivityY));
+    ui::SetText(GetDlgItem(hwnd_, kAimSensX), Format(s.aim.aimSensitivityX));
+    ui::SetText(GetDlgItem(hwnd_, kAimSensY), Format(s.aim.aimSensitivityY));
     ui::SetText(GetDlgItem(hwnd_, kDeadzone), Format(s.aim.deadzone));
     ui::SetText(GetDlgItem(hwnd_, kAntiDeadzone), Format(s.aim.antiDeadzone));
     ui::SetText(GetDlgItem(hwnd_, kAcceleration), Format(s.aim.acceleration));
+    ui::SetText(GetDlgItem(hwnd_, kSmooth), Format(s.aim.smoothingMs, 0));
+    ui::SetText(GetDlgItem(hwnd_, kCurveExp), Format(s.aim.curveExponent));
     SendMessageW(GetDlgItem(hwnd_, kInvertY), BM_SETCHECK, s.aim.invertY ? BST_CHECKED : BST_UNCHECKED, 0);
+    SendMessageW(GetDlgItem(hwnd_, kCurve), BM_SETCHECK, s.aim.exponentialCurve ? BST_CHECKED : BST_UNCHECKED, 0);
 }
 
 void SettingsWindow::OnCommand(int id, int notification) {
@@ -243,6 +291,9 @@ void SettingsWindow::OnCommand(int id, int notification) {
                 SetMessage("Não achei o Veyra.exe. Escolha o arquivo com Procurar.", ui::kBad);
             }
             break;
+        case kBindings:
+            OpenBindings();
+            break;
         case kAdvanced:
             ToggleAdvanced();
             break;
@@ -263,9 +314,29 @@ void SettingsWindow::OnCommand(int id, int notification) {
     }
 }
 
-void SettingsWindow::ToggleAdvanced() {
+void SettingsWindow::ToggleAdvanced() { ApplyLayout(); }
+
+void SettingsWindow::ApplyLayout() {
     const bool show = SendMessageW(GetDlgItem(hwnd_, kAdvanced), BM_GETCHECK, 0, 0) == BST_CHECKED;
     for (HWND control : advanced_) ShowWindow(control, show ? SW_SHOW : SW_HIDE);
+
+    const int bottomY = show ? kBottomExpandedY : kBottomCollapsedY;
+    for (int id : {kForget, kSetup, kCancel, kSave}) MoveToY(hwnd_, id, bottomY);
+    MoveToY(hwnd_, kMessage, bottomY + kMessageGap);
+
+    RECT frame{0, 0, kWidth, show ? kHeightExpanded : kHeightCollapsed};
+    AdjustWindowRect(&frame, kStyle, FALSE);
+    SetWindowPos(hwnd_, nullptr, 0, 0, frame.right - frame.left, frame.bottom - frame.top,
+                 SWP_NOMOVE | SWP_NOZORDER);
+}
+
+void SettingsWindow::OpenBindings() {
+    if (bindings_ && !bindings_->IsOpen()) bindings_.reset();
+    if (bindings_) {
+        bindings_->Show();
+        return;
+    }
+    bindings_ = std::make_unique<BindingsWindow>(instance_, app_);
 }
 
 bool SettingsWindow::Save() {
@@ -293,19 +364,29 @@ bool SettingsWindow::Save() {
 
     const auto sensX = ParseFloat(ui::GetText(GetDlgItem(hwnd_, kSensX)), 0.1f, 5.0f);
     const auto sensY = ParseFloat(ui::GetText(GetDlgItem(hwnd_, kSensY)), 0.1f, 5.0f);
+    const auto aimSensX = ParseFloat(ui::GetText(GetDlgItem(hwnd_, kAimSensX)), 0.1f, 5.0f);
+    const auto aimSensY = ParseFloat(ui::GetText(GetDlgItem(hwnd_, kAimSensY)), 0.1f, 5.0f);
     const auto deadzone = ParseFloat(ui::GetText(GetDlgItem(hwnd_, kDeadzone)), 0.0f, 0.5f);
     const auto antiDeadzone = ParseFloat(ui::GetText(GetDlgItem(hwnd_, kAntiDeadzone)), 0.0f, 0.5f);
     const auto acceleration = ParseFloat(ui::GetText(GetDlgItem(hwnd_, kAcceleration)), 0.0f, 1.0f);
-    if (!sensX || !sensY || !deadzone || !antiDeadzone || !acceleration) {
+    const auto smoothing = ParseFloat(ui::GetText(GetDlgItem(hwnd_, kSmooth)), 0.0f, 200.0f);
+    const auto curveExponent = ParseFloat(ui::GetText(GetDlgItem(hwnd_, kCurveExp)), 1.0f, 3.0f);
+    if (!sensX || !sensY || !aimSensX || !aimSensY || !deadzone || !antiDeadzone || !acceleration || !smoothing ||
+        !curveExponent) {
         SetMessage("Ajustes de mira fora do intervalo. Veja os limites ao lado de cada campo.", ui::kBad);
         return false;
     }
     s.aim.sensitivityX = *sensX;
     s.aim.sensitivityY = *sensY;
+    s.aim.aimSensitivityX = *aimSensX;
+    s.aim.aimSensitivityY = *aimSensY;
     s.aim.deadzone = *deadzone;
     s.aim.antiDeadzone = *antiDeadzone;
     s.aim.acceleration = *acceleration;
+    s.aim.smoothingMs = *smoothing;
+    s.aim.curveExponent = *curveExponent;
     s.aim.invertY = SendMessageW(GetDlgItem(hwnd_, kInvertY), BM_GETCHECK, 0, 0) == BST_CHECKED;
+    s.aim.exponentialCurve = SendMessageW(GetDlgItem(hwnd_, kCurve), BM_GETCHECK, 0, 0) == BST_CHECKED;
 
     auto checked = [this](int id) { return SendMessageW(GetDlgItem(hwnd_, id), BM_GETCHECK, 0, 0) == BST_CHECKED; };
     s.autoConnectOnLaunch = checked(kAutoConnect);

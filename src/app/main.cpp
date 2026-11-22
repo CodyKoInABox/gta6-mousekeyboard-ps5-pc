@@ -2,9 +2,23 @@
 
 #include "app/app_controller.h"
 #include "app/main_window.h"
+#include "app/ui.h"
+#include "core/windows_support.h"
+#include "platform/windows_version.h"
 
 int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int) {
     SetProcessDPIAware();
+
+    const pskb::WindowsVersion version = pskb::CurrentWindowsVersion();
+    const pskb::WindowsSupport support = pskb::CheckWindowsSupport(version);
+    if (support != pskb::WindowsSupport::Supported) {
+        const std::wstring text = pskb::ui::ToWide(pskb::WindowsSupportMessage(version, support));
+        if (support == pskb::WindowsSupport::Unsupported) {
+            MessageBoxW(nullptr, text.c_str(), L"PS5 Keyboard Bridge", MB_ICONERROR);
+            return 1;
+        }
+        MessageBoxW(nullptr, text.c_str(), L"PS5 Keyboard Bridge", MB_ICONWARNING);
+    }
 
     if (HWND existing = pskb::MainWindow::FindRunningInstance()) {
         if (IsIconic(existing)) ShowWindow(existing, SW_RESTORE);
@@ -31,7 +45,7 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int) {
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
         if (msg.hwnd) {
             HWND root = GetAncestor(msg.hwnd, GA_ROOT);
-            if (root && IsDialogMessageW(root, &msg)) continue;
+            if (root && !GetPropW(root, pskb::ui::kRawKeysProp) && IsDialogMessageW(root, &msg)) continue;
         }
         TranslateMessage(&msg);
         DispatchMessageW(&msg);

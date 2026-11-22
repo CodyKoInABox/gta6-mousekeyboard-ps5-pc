@@ -12,10 +12,11 @@
 namespace pskb {
 
 // What the main screen shows. Derived from the link and capture state, never stored.
-enum class AppStatus : unsigned char { Disconnected, Connecting, Connected, Playing, Error };
+enum class AppStatus : unsigned char { Disconnected, Connecting, Connected, Playing, NoNetwork, Error };
 
 const char* AppStatusText(AppStatus status) noexcept;
-AppStatus DeriveAppStatus(LinkState link, CaptureMode capture) noexcept;
+// `error` is the link's current error; a Retrying link with NetworkUnavailable shows NoNetwork.
+AppStatus DeriveAppStatus(LinkState link, CaptureMode capture, LinkError error = LinkError::None) noexcept;
 
 enum class WizardStep : unsigned char {
     Welcome,

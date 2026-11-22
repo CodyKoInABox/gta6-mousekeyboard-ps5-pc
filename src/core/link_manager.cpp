@@ -10,6 +10,9 @@ using namespace std::chrono_literals;
 
 PadState NeutralPad() { return PadState{}; }
 
+constexpr const char* kNoNetworkMessage =
+    "Sem conexão de rede. Verifique o Wi-Fi ou o cabo; o app tenta de novo sozinho.";
+
 }  // namespace
 
 const char* LinkStateName(LinkState state) noexcept {
@@ -43,8 +46,9 @@ const char* LinkErrorName(LinkError error) noexcept {
     return "unknown";
 }
 
-LinkManager::LinkManager(IRemotePlayBackend& backend, PairingLoader loader, RetryPolicy policy)
-    : backend_(backend), loader_(std::move(loader)), policy_(policy) {
+LinkManager::LinkManager(IRemotePlayBackend& backend, PairingLoader loader, RetryPolicy policy,
+                         NetworkProbe networkProbe)
+    : backend_(backend), loader_(std::move(loader)), policy_(policy), networkProbe_(std::move(networkProbe)) {
     worker_ = std::thread([this] { Run(); });
 }
 
@@ -133,6 +137,10 @@ bool LinkManager::Wanted() const {
     return wantConnected_ && !stop_;
 }
 
+bool LinkManager::NetworkUp() const {
+    return !networkProbe_ || networkProbe_();
+}
+
 void LinkManager::WaitRetry(unsigned int delayMs) {
     std::unique_lock lock(mutex_);
     cv_.wait_for(lock, std::chrono::milliseconds(delayMs), [this] { return stop_ || !wantConnected_; });
@@ -171,8 +179,21 @@ void LinkManager::Run() {
                 break;
             }
 
+            if (!NetworkUp()) {
+                SetState(LinkState::Retrying, LinkError::NetworkUnavailable, kNoNetworkMessage, attempt);
+                WaitRetry(policy_.networkCheckMs);
+                if (!Wanted()) {
+                    SetState(LinkState::Idle, LinkError::Cancelled, "Desconectado.", 0);
+                    break;
+                }
+                continue;
+            }
+
             SetState(LinkState::Connecting, LinkError::None, "Conectando\u2026", attempt + 1);
-            const ConnectResult result = backend_.Connect(*pairing);
+            ConnectResult result = backend_.Connect(*pairing);
+            if (!result.ok && !NetworkUp()) {
+                result = {false, LinkError::NetworkUnavailable, kNoNetworkMessage};
+            }
 
             if (!Wanted()) {
                 backend_.Disconnect();

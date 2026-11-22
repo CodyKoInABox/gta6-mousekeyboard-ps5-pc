@@ -12,7 +12,7 @@ struct NamedCode {
 };
 
 // Windows virtual-key values, so the Win32 layer can pass them straight through.
-constexpr std::array<NamedCode, 40> kNamedCodes{{
+constexpr NamedCode kNamedCodes[] = {
     {"Space", 0x20},     {"Tab", 0x09},       {"Enter", 0x0D},      {"Esc", 0x1B},
     {"Backspace", 0x08}, {"LShift", 0xA0},    {"RShift", 0xA1},     {"LCtrl", 0xA2},
     {"RCtrl", 0xA3},     {"LAlt", 0xA4},      {"RAlt", 0xA5},       {"Up", 0x26},
@@ -23,8 +23,10 @@ constexpr std::array<NamedCode, 40> kNamedCodes{{
     {"F8", 0x77},        {"F9", 0x78},        {"F10", 0x79},        {"F11", 0x7A},
     {"F12", 0x7B},       {"MouseLeft", kMouseLeft},     {"MouseRight", kMouseRight},
     {"MouseMiddle", kMouseMiddle}, {"MouseX1", kMouseX1}, {"MouseX2", kMouseX2},
-    {"Numpad0", 0x60},   {"Numpad1", 0x61},
-}};
+    {"Numpad0", 0x60},   {"Numpad1", 0x61},   {"Numpad2", 0x62},   {"Numpad3", 0x63},
+    {"Numpad4", 0x64},   {"Numpad5", 0x65},   {"Numpad6", 0x66},   {"Numpad7", 0x67},
+    {"Numpad8", 0x68},   {"Numpad9", 0x69},
+};
 
 bool EqualsIgnoreCase(std::string_view a, std::string_view b) {
     if (a.size() != b.size()) return false;

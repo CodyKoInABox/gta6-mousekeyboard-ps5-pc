@@ -105,7 +105,7 @@ PadState PadEngine::Update(double nowMs) {
     l2_ = Approach(l2_, l2Goal, triggerStep);
     r2_ = Approach(r2_, r2Goal, triggerStep);
 
-    const StickVector aim = mouse_.Evaluate(nowMs);
+    const StickVector aim = mouse_.Evaluate(nowMs, l2_ > 0.5f);
 
     PadState out;
     out.buttons = buttons;

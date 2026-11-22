@@ -34,8 +34,13 @@ struct RetryPolicy {
     unsigned int baseDelayMs = 2000;
     unsigned int maxDelayMs = 30000;
     unsigned int refusedDelayMs = 10000;
+    unsigned int networkCheckMs = 3000;  // how often to re-check the network while it is down
     bool autoReconnect = true;
 };
+
+// True when the PC has a usable network connection. Injected so tests do not depend on the
+// real adapters.
+using NetworkProbe = std::function<bool()>;
 
 // Owns the connection lifecycle: one worker thread, at most one Connect() in flight, and no
 // second session while one is connected. Pad frames are forwarded only while Connected.
@@ -44,7 +49,9 @@ public:
     using PairingLoader = std::function<std::optional<PairingInfo>()>;
     using StatusListener = std::function<void(const LinkStatus&)>;
 
-    LinkManager(IRemotePlayBackend& backend, PairingLoader loader, RetryPolicy policy = {});
+    // A null probe means "always connected", which is what the unit tests rely on.
+    LinkManager(IRemotePlayBackend& backend, PairingLoader loader, RetryPolicy policy = {},
+                NetworkProbe networkProbe = {});
     ~LinkManager();
 
     LinkManager(const LinkManager&) = delete;
@@ -68,6 +75,7 @@ private:
     void Run();
     void SetState(LinkState state, LinkError error, std::string message, unsigned int attempt);
     bool Wanted() const;
+    bool NetworkUp() const;
     void WaitRetry(unsigned int delayMs);
     void HoldWhileConnected();
     void Notify(const LinkStatus& status);
@@ -75,6 +83,7 @@ private:
     IRemotePlayBackend& backend_;
     PairingLoader loader_;
     RetryPolicy policy_;
+    NetworkProbe networkProbe_;
 
     mutable std::mutex mutex_;
     std::condition_variable cv_;
