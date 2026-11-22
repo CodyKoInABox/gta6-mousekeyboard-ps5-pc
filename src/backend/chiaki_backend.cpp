@@ -63,7 +63,7 @@ std::string QuitMessage(int reason) {
         case CHIAKI_QUIT_REASON_SESSION_REQUEST_CONNECTION_REFUSED:
             return "O PS5 recusou a conexão. Ele leva cerca de 10 segundos para aceitar uma nova sessão.";
         case CHIAKI_QUIT_REASON_SESSION_REQUEST_RP_IN_USE:
-            return "Outro aplicativo (PS Remote Play, Chiaki ou Veyra) já está conectado ao PS5. "
+            return "Outro Remote Play (PS Remote Play no PC ou no celular, ou Chiaki) já está conectado ao PS5. "
                    "Feche-o e tente de novo.";
         case CHIAKI_QUIT_REASON_SESSION_REQUEST_RP_CRASH:
             return "O serviço Remote Play do PS5 falhou. Tente novamente em alguns segundos.";
