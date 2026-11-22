@@ -25,6 +25,7 @@ add_library(pskb_core STATIC
   src/core/bindings.cpp
   src/core/pad_engine.cpp
   src/core/account_id.cpp
+  src/core/psn_login.cpp
   src/core/pairing.cpp
   src/core/secure_store.cpp
   src/core/settings.cpp
@@ -39,6 +40,7 @@ target_link_libraries(pskb_core PUBLIC crypt32)
 add_library(pskb_backend STATIC
   src/backend/chiaki_backend.cpp
   src/backend/chiaki_discovery.cpp
+  src/backend/psn_signin.cpp
 )
 target_include_directories(pskb_backend PUBLIC src)
 target_compile_options(pskb_backend PRIVATE /W4 /utf-8 /permissive-)
@@ -60,6 +62,7 @@ if(PSKB_BUILD_TESTS)
     tests/test_bindings.cpp
     tests/test_pad_engine.cpp
     tests/test_account_id.cpp
+    tests/test_psn_login.cpp
     tests/test_pairing.cpp
     tests/test_secure_store.cpp
     tests/test_settings.cpp
