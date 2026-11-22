@@ -1,12 +1,16 @@
 #include <windows.h>
+#include <wchar.h>
 
 #include "app/app_controller.h"
 #include "app/main_window.h"
+#include "app/self_test.h"
 #include "app/ui.h"
 #include "core/windows_support.h"
 #include "platform/windows_version.h"
 
-int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int) {
+int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR commandLine, int) {
+    if (commandLine && wcsstr(commandLine, L"--self-test")) return pskb::RunSelfTest(instance);
+
     SetProcessDPIAware();
 
     const pskb::WindowsVersion version = pskb::CurrentWindowsVersion();
