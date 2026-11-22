@@ -32,6 +32,10 @@ Ao clicar em **JOGAR**, o app procura processos de Remote Play abertos no PC (PS
 
 O app não consegue ver sessões de Remote Play abertos no celular. Se a conexão for recusada, feche o Remote Play do celular também.
 
+O Veyra NRVideo não entra nessa verificação. Ele só mostra a imagem da capturadora e não abre uma sessão de Remote Play com o PS5, então um Veyra aberto não causa conflito.
+
+*Veyra NRVideo is not part of this check. It only shows the capture card picture and never opens a Remote Play session with the PS5, so an open Veyra window is not a conflict.*
+
 ## Status "Sem rede" ("Sem conexão de rede. Verifique o Wi-Fi ou o cabo; o app tenta de novo sozinho.")
 
 O PC não tem uma conexão de rede utilizável. O app não tenta conectar sem rede: ele confere de novo a cada 3 segundos e retoma sozinho quando o Wi-Fi ou o cabo voltar.

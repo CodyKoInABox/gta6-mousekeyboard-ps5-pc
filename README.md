@@ -13,8 +13,9 @@ Status: release candidate. See `docs/RESEARCH.md` for the backend decision.
 - Troubleshooting (pt-BR): `docs/solucao-de-problemas.md`
 - Real-hardware test checklist: `docs/checklist-hardware.md`
 
-Download the installer or the portable zip from the release page. Each release lists SHA-256
-checksums in `SHA256SUMS.txt`.
+Download the installer or the portable zip from the [v0.1.0 release](https://github.com/CodyKoInABox/gta6-mousekeyboard-ps5-pc/releases/tag/v0.1.0). Each release lists SHA-256
+checksums in `SHA256SUMS.txt`. The release is unsigned, so Windows SmartScreen may warn; the
+[setup guide](docs/guia-configuracao.md) explains how to continue.
 
 ## Build (Windows 10/11 x64)
 
