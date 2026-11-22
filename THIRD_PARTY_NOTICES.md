@@ -26,6 +26,20 @@ password is only entered on Sony's page, never in this app.
 The complete corresponding source of this project, including the vendored components above,
 is in this repository. Build instructions are in `README.md`.
 
+## Distributed installer and portable package
+
+- The installer (`PS5KeyboardBridge-Setup-<versão>.exe`) is built with Inno Setup 6
+  (<https://jrsoftware.org/isinfo.php>). The Inno Setup runtime is part of the installer and is
+  free to redistribute. The Brazilian Portuguese messages come from Inno Setup's own language file.
+- The application binaries link the Microsoft C++ runtime statically (`/MT`), so no separate
+  Visual C++ redistributable is installed.
+- Each release ships `LICENSE.txt` (AGPL-3.0), this file, and the setup guide and troubleshooting
+  guide. The installer and portable zip are built from the tagged source with `scripts/build-release.ps1`.
+- Source offer: the complete corresponding source for every binary is in this repository at the
+  same version (`CMakeLists.txt` gives the version). Requests for the source of a release can be
+  made through the repository's issues.
+- `SHA256SUMS.txt` lists the SHA-256 of each published artifact.
+
 ## Not included
 
 - Sony PlayStation software, firmware, or assets.
